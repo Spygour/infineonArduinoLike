@@ -46,17 +46,17 @@
 /* This function initializes the port pin which drives the LED */
 void setPinOutput(Ifx_P *port, uint8 pinIndex){
     IfxPort_setPinModeOutput(port,pinIndex, IfxPort_OutputMode_pushPull, IfxPort_OutputIdx_general);
-    IfxPort_setPinHigh(port,pinIndex);
+    IfxPort_setPinLow(port,pinIndex);
 }
 void setPinOutputTrue(Ifx_P *port, uint8 pinIndex){
-    IfxPort_setPinLow(port,pinIndex);
+    IfxPort_setPinHigh(port,pinIndex);
 }
 
 void togglePinOutput(Ifx_P *port, uint8 pinIndex){
     IfxPort_togglePin(port,pinIndex);
 }
 void setPinOutputFalse(Ifx_P *port, uint8 pinIndex){
-    IfxPort_setPinHigh(port,pinIndex);
+    IfxPort_setPinLow(port,pinIndex);
 }
 
 void setPinInputPullup(Ifx_P *port, uint8 pinIndex){
