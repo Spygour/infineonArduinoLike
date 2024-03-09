@@ -58,6 +58,6 @@
 /*********************************************************************************************************************/
 void initTomInterrupt(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,uint16 tom,uint16 channel, uint16 clock);
 void initAtomInterrupt(IfxGtm_Atom_Timer* mytimer,float32 frequency, uint16 priority,uint16 atom,uint16 channel, uint16 clock);
-void initGpt12Timer(uint16 reload,uint16 priority);
+void initGpt12interrupt(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,IfxGpt12_TimerInputPrescaler timerPrescaler,uint16 priority);
 void interruptGpt12(void);
 #endif /* INTERRUPTS_H_ */
