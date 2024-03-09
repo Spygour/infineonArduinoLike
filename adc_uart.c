@@ -75,7 +75,7 @@ ApplicationVadcBackgroundScan g_vadcBackgroundScan;
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
 void initSerialInterface(void);
-void send_data(char *message,Ifx_SizeT length);
+void UartWrite(char *message,Ifx_SizeT length);
 void send_vadc_single(uint32 adcVal);
 void send_vadc_group(uint32 chnIx, uint32 adcVal);
 /*********************************************************************************************************************/
@@ -166,7 +166,7 @@ void send_vadc_group(uint32 chnIx, uint32 adcVal)
     str[9] = (char)(adcVal % 10) + 48;                                       /* Units                            */
 
     /* Print via UART */
-    send_data(str, 12);
+    UartWrite(str, 12);
 }
 
 /*vadc single channel initialize and set part */
@@ -227,10 +227,10 @@ void send_vadc_single(uint32 adcVal)
     str[3] = (char)(adcVal % 10) + 48;                                       /* Units                            */
 
     /* Print via UART */
-    send_data(str, TX_LENGTH);
+    UartWrite(str, TX_LENGTH);
 }
 /*uart ISR and read/write part */
-void send_data(char *message,Ifx_SizeT length){
+void UartWrite(char *message,Ifx_SizeT length){
     IfxAsclin_Asc_write(&g_asc,message,&length,TIME_INFINITE);
 }
 
