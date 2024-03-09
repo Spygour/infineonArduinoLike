@@ -54,7 +54,7 @@ void init_vadc_background(IfxVadc_GroupId vadc_group,IfxVadc_ChannelId channel_i
 void run_vadc_background(void);
 void send_vadc_single(uint32 adcVal);
 void initSerialInterface(void);
-void send_data(char *data, Ifx_SizeT length);
+void UartWrite(char *data, Ifx_SizeT length);
 void receive_data(char *data, Ifx_SizeT length);
 void init_vadc_group(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup);
 void run_vadc_group(uint32 channels);
