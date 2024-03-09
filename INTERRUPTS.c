@@ -34,6 +34,7 @@
 #include "IfxPort.h"
 #include "IfxGtm_Atom_Timer.h"
 #include "IfxGtm_Tom_Timer.h"
+
 #include "INTERRUPTS.h"
 
 /*********************************************************************************************************************/
@@ -67,7 +68,8 @@ void initTomInterrupt(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,ui
     timerConfig.base.isrProvider     = IfxSrc_Tos_cpu0;                         /* Set interrupt provider           */
     timerConfig.tom                  = tom;                            /* Define the timer used            */
     timerConfig.timerChannel         = channel;                         /* Define the channel used          */
-    timerConfig.clock                = clock;          /* Define the CMU clock used        */
+    timerConfig.clock                = clock;
+    /* Define the CMU clock used        */
 
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);               /* Enable the CMU clock             */
     IfxGtm_Tom_Timer_init(mytomtimer, &timerConfig);                        /* Initialize the TOM               */
@@ -100,16 +102,16 @@ void initAtomInterrupt(IfxGtm_Atom_Timer* mytimer,float32 frequency, uint16 prio
 }
 
 
-void initGpt12interrupt(uint16 reload,uint16 priority)
+void initGpt12interrupt(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,IfxGpt12_TimerInputPrescaler timerPrescaler,uint16 priority)
 {
     /* Initialize the GPT12 module */
     IfxGpt12_enableModule(&MODULE_GPT120);                                          /* Enable the GPT12 module      */
-    IfxGpt12_setGpt1BlockPrescaler(&MODULE_GPT120, IfxGpt12_Gpt1BlockPrescaler_32); /* Set GPT1 block prescaler     */
+    IfxGpt12_setGpt1BlockPrescaler(&MODULE_GPT120, gtp1prescaler); /* Set GPT1 block prescaler     */
 
     /* Initialize the Timer T3 */
     IfxGpt12_T3_setMode(&MODULE_GPT120, IfxGpt12_Mode_timer);                       /* Set T3 to timer mode         */
     IfxGpt12_T3_setTimerDirection(&MODULE_GPT120, IfxGpt12_TimerDirection_down);    /* Set T3 count direction       */
-    IfxGpt12_T3_setTimerPrescaler(&MODULE_GPT120, IfxGpt12_TimerInputPrescaler_64); /* Set T3 input prescaler       */
+    IfxGpt12_T3_setTimerPrescaler(&MODULE_GPT120, timerPrescaler); /* Set T3 input prescaler       */
     IfxGpt12_T3_setTimerValue(&MODULE_GPT120, reload);                        /* Set T3 start value           */
 
     /* Initialize the Timer T2 */
@@ -125,6 +127,8 @@ void initGpt12interrupt(uint16 reload,uint16 priority)
 
     IfxGpt12_T3_run(&MODULE_GPT120, IfxGpt12_TimerRun_start);                       /* Start the timer              */
 }
+
+
 
 /* Interrupt Service Routine of the GPT12 */
 void interruptGpt12(void)
