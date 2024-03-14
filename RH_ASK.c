@@ -561,7 +561,7 @@ void receiveTimer()
         {
             // Got all the bytes now
             _rxActive = 0;
-            _rxBufFull = 0;
+            _rxBufFull = 1;
             setModeIdle();
         }
         _rxBitCount = 0;
