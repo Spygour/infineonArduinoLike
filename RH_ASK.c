@@ -30,9 +30,7 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "RH_ASK.h"
-#include "pinsReadWrite.h"
-#include "INTERRUPTS.h"
-#include "IfxStm.h"
+
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -363,10 +361,11 @@ boolean waitCAD()
     // DCF : BackoffTime = random() x aSlotTime
     // 100 - 1000 ms
     // 10 sec timeout
-    uint64 t = IfxStm_get(&MODULE_STM0)/(IfxStm_getFrequency(&MODULE_STM0)*1000);
+    uint64 t = IfxStm_get(&MODULE_STM0);
+    Ifx_TickTime cad_timeout = IfxStm_getTicksFromMilliseconds(BSP_DEFAULT_TIMER,(uint32)RHASK.RHGeneric._cad_timeout);
     while (isChannelActive())
     {
-      if (IfxStm_get(&MODULE_STM0)/(IfxStm_getFrequency(&MODULE_STM0)*1000) - t > RHASK.RHGeneric._cad_timeout){
+      if (IfxStm_get(&MODULE_STM0)- t > cad_timeout){
          return 0;
          }
      Ifx_TickTime randTime =IfxStm_getTicksFromMilliseconds(BSP_DEFAULT_TIMER,((rand()&10)+1) * 100);
@@ -378,7 +377,7 @@ boolean waitCAD()
 }
 
 //calculates the crc of bits to be transmited on txbuffer and then sends them
-boolean send(const uint8* data, uint8 len)
+boolean ASKsend(const uint8* data, uint8 len)
 {
     uint8 i;
     uint16 index = 0;
