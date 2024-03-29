@@ -37,6 +37,7 @@
 #define PHASE_U_HS                &IfxGtm_TOM1_4_TOUT14_P00_5_OUT /*                */
 #define PHASE_V_HS                &IfxGtm_TOM1_2_TOUT12_P00_3_OUT  /*                */
 #define PHASE_W_HS                &IfxGtm_TOM1_5_TOUT15_P00_6_OUT  /* Pin driven by the PWM, P33.2                   */
+#define CHANNELS_PWM               300
 
 
 
@@ -78,83 +79,12 @@ IFX_STATIC void IfxGtm_Tom_PwmCCX_updateOff(IfxGtm_Tom_PwmHl *driver, Ifx_TimerV
 }
 
 
-IFX_STATIC void IfxGtm_Tom_PwmCCX_updatePulseOff(IfxGtm_Tom_PwmHl *driver, float32 *tOn, float32 *offset)
-{
-    IFX_UNUSED_PARAMETER(tOn)
-    IFX_UNUSED_PARAMETER(offset)
-    IfxGtm_Tom_PwmCCX_updateOff(driver, NULL_PTR);
-}
-IFX_STATIC void IfxGtm_Tom_PwmCCX_updateAndShiftOff(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn, Ifx_TimerValue *shift)
-{
-    IFX_UNUSED_PARAMETER(tOn)
-    IFX_UNUSED_PARAMETER(shift)
-
-    IfxGtm_Tom_PwmCCX_updateOff(driver, NULL_PTR);
-}
-
 void IfxGtm_Tom_PwmCCX_setOnTime(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
     driver->update(driver, tOn);
 }
 
-IFX_STATIC void IfxGtm_Tom_PwmCCX_updatePulse(IfxGtm_Tom_PwmHl *driver, float32 *tOn, float32 *offset)
-{
-    uint8          channelIndex;
-    Ifx_TimerValue period;
 
-    period = driver->timer->base.period;
-
-    /* Top channels */
-    for (channelIndex = 0; channelIndex < driver->base.channelCount; channelIndex++)
-    {
-        Ifx_TimerValue x; /* x=period*dutyCycle, x=OnTime+deadTime */
-        Ifx_TimerValue o;
-        Ifx_TimerValue cm0, cm1;
-
-        x = IfxStdIf_Timer_sToTick(driver->timer->base.clockFreq, tOn[channelIndex]);
-        o = IfxStdIf_Timer_sToTick(driver->timer->base.clockFreq, offset[channelIndex]);
-
-        if (driver->base.inverted != FALSE)
-        {
-            x = period - x;
-        }
-        else
-        {}
-
-        if ((x < driver->base.minPulse) || (o > period))
-        {
-            x = 0;
-        }
-        else if ((x > driver->base.maxPulse) || (o + x > period))
-        {
-            x = period;
-        }
-        else
-        {}
-
-        /* Special handling due to GTM issue */
-        if (x == period)
-        {   /* 100% duty cycle */
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex],
-                period + 1 /* No compare event */,
-                2 /* 1st compare event (issue: expected to be 1)*/);
-        }
-        else if (x == 0)
-        {
-            cm0 = 1;
-            cm1 = period + 2;
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0, cm1);
-        }
-        else
-        {                /* x% duty cycle */
-            cm1 = 2 + o; // CM1, set to 2 due to a GTM issue. should be 1 according to spec
-            cm0 = o + x; // CM0, set to x+2 due to a GTM issue. should be x+1 according to spec
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0, cm1);
-        }
-    }
-
-
-}
 
 IFX_STATIC void IfxGtm_Tom_PwmCCX_updateCenterAligned(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
@@ -170,115 +100,26 @@ IFX_STATIC void IfxGtm_Tom_PwmCCX_updateCenterAligned(IfxGtm_Tom_PwmHl *driver, 
         Ifx_TimerValue cm0, cm1;
         x = tOn[channelIndex];
 
-        if (driver->base.inverted != FALSE)
-        {
-            x = period - x;
-        }
-        else
-        {}
-
-        if ((x < driver->base.minPulse) || (x <= deadtime))
-        {                       /* For deadtime condition: avoid leading edge of top channel to occur after the trailing edge */
-            x = 0;
-        }
-        else if (x > driver->base.maxPulse)
-        {
-            x = period;
-        }
-        else
-        {}
-
-        /* Special handling due to GTM issue */
         if (x == period)
-        {                       /* 100% duty cycle */
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex],
-                period + 1 /* No compare event */,
-                2 /* 1st compare event (issue: expected to be 1) */ + deadtime);
-        }
-        else if (x == 0)
         {
             cm0 = 1;
             cm1 = period + 2;
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0, cm1);
+            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], 0, 0);
         }
         else
         {                           /* x% duty cycle */
-            cm1 = (period - x) / 2; // CM1
-            cm0 = (period + x) / 2; // CM0
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], x, x+100);
+            cm1 = x+CHANNELS_PWM; // CM1
+            cm0 = x; // CM0
+            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0,cm1);
         }
     }
 }
 
-IFX_STATIC void IfxGtm_Tom_PwmCCX_updateShiftCenterAligned(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn, Ifx_TimerValue *shift)
-{
-    uint8          channelIndex;
-    Ifx_TimerValue period;
-    Ifx_TimerValue deadtime = driver->base.deadtime;
 
-    period = driver->timer->base.period;
-
-    for (channelIndex = 0; channelIndex < driver->base.channelCount; channelIndex++)
-    {
-        Ifx_TimerValue x; /* x=period*dutyCycle, x=OnTime+deadTime */
-        Ifx_TimerValue s; /* Shift value */
-        Ifx_TimerValue cm0, cm1;
-        x = tOn[channelIndex];
-
-        if (driver->base.inverted != FALSE)
-        {
-            x = period - x;
-        }
-        else
-        {}
-
-        if ((x < driver->base.minPulse) || (x <= deadtime))
-        {   /* For deadtime condition: avoid leading edge of top channel to occur after the trailing edge */
-            x = 0;
-        }
-        else if (x > driver->base.maxPulse)
-        {
-            x = period;
-        }
-        else
-        {}
-
-        /* Special handling due to GTM issue */
-        if (x == period)
-        {   /* 100% duty cycle */
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex],
-                period + 1 /* No compare event */,
-                2 /* 1st compare event (issue: expected to be 1)*/ + deadtime);
-        }
-        else if (x == 0)
-        {
-            cm0 = 1;
-            cm1 = period + 2;
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0, cm1);
-        }
-        else
-        {                           /* x% duty cycle */
-            s = shift[channelIndex];
-
-            if (s > 0)
-            {
-                s = __minX(s, (period - x) / 2 - 1);
-            }
-            else
-            {
-                s = __maxX(s, (x - period) / 2 + 1);
-            }
-
-            cm1 = s + (period - x) / 2; // CM1
-            cm0 = s + (period + x) / 2; // CM0
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0, cm1 + deadtime);
-        }
-    }
-}
 
 IFX_STATIC IFX_CONST IfxGtm_Tom_PwmHl_Mode IfxGtm_Tom_Pwmccx_modes[2] = {
-    {Ifx_Pwm_Mode_centerAligned,         FALSE, &IfxGtm_Tom_PwmCCX_updateCenterAligned, &IfxGtm_Tom_PwmCCX_updateShiftCenterAligned, &IfxGtm_Tom_PwmCCX_updatePulse   },
-    {Ifx_Pwm_Mode_off,                   FALSE, &IfxGtm_Tom_PwmCCX_updateOff,           &IfxGtm_Tom_PwmCCX_updateAndShiftOff,        &IfxGtm_Tom_PwmCCX_updatePulseOff}
+    {Ifx_Pwm_Mode_centerAligned,         FALSE, &IfxGtm_Tom_PwmCCX_updateCenterAligned},
+    {Ifx_Pwm_Mode_off,                   FALSE, &IfxGtm_Tom_PwmCCX_updateOff         }
 };
 
 
@@ -299,8 +140,7 @@ boolean IfxGtm_Tom_Pwmccx_setMode(IfxGtm_Tom_PwmHl *driver, Ifx_Pwm_Mode mode)
 
         base->mode             = mode;
         driver->update         = IfxGtm_Tom_Pwmccx_modes[0].update;
-        driver->updateAndShift = IfxGtm_Tom_Pwmccx_modes[0].updateAndShift;
-        driver->updatePulse    = IfxGtm_Tom_Pwmccx_modes[0].updatePulse;
+
 
             driver->ccxTemp   = driver->ccx;
 
@@ -347,8 +187,7 @@ boolean IfxGtm_Tom_Pwmccx_init(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config
     driver->base.coutxActiveState = config->base.coutxActiveState;
     driver->base.channelCount     = config->base.channelCount;
 
-    IfxGtm_Tom_PwmHl_setDeadtime(driver, config->base.deadtime);
-    IfxGtm_Tom_PwmHl_setMinPulse(driver, config->base.minPulse);
+
 
     driver->tom = &(timer->gtm->TOM[config->tom]);
 
@@ -417,7 +256,7 @@ boolean IfxGtm_Tom_Pwmccx_init(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config
     return result;
 }
 
-void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMasterChannel,float32 phase_shift){
+void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMasterChannel,Ifx_TimerValue phase_shift){
     /* Enable the GTM Module */
      IfxGtm_enable(&MODULE_GTM);
      /* Set the GTM global clock frequency in Hz */
@@ -473,9 +312,9 @@ void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMaster
          IfxGtm_Tom_Timer_updateInputFrequency(&g_pwm3PhaseOutput.timer);
          IfxGtm_Tom_Timer_run(&g_pwm3PhaseOutput.timer);
          /* Calculate initial values of PWM duty cycles */
-         g_pwm3PhaseOutput.pwmOnTimes[0] = g_pwm3PhaseOutput.pwm.timer->base.period * 0.10;
-         g_pwm3PhaseOutput.pwmOnTimes[1] = g_pwm3PhaseOutput.pwm.timer->base.period * 0.20;
-         g_pwm3PhaseOutput.pwmOnTimes[2] = g_pwm3PhaseOutput.pwm.timer->base.period * 0.75;
+         g_pwm3PhaseOutput.pwmOnTimes[0] = g_pwm3PhaseOutput.pwm.timer->base.period * 0;
+         g_pwm3PhaseOutput.pwmOnTimes[1] = g_pwm3PhaseOutput.pwm.timer->base.period * phase_shift/(g_pwm3PhaseOutput.pwm.timer->base.period);
+         g_pwm3PhaseOutput.pwmOnTimes[2] = g_pwm3PhaseOutput.pwm.timer->base.period * 2*phase_shift/(g_pwm3PhaseOutput.pwm.timer->base.period);
          /* Update PWM duty cycles */
          IfxGtm_Tom_Timer_disableUpdate(&g_pwm3PhaseOutput.timer);
          IfxGtm_Tom_PwmCCX_setOnTime(&g_pwm3PhaseOutput.pwm, g_pwm3PhaseOutput.pwmOnTimes);
