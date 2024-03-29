@@ -53,6 +53,6 @@
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
 void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMasterChannel,float32 phase_shift);
-void updateGtmTomPwmDutyCycles(void);
+
 
 #endif /* PHASESHIFTPWM_H_ */
