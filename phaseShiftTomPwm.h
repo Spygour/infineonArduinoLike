@@ -25,18 +25,24 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-#ifndef PHASESHIFTPWM_H_
-#define PHASESHIFTPWM_H_
-#include "Ifx_Types.h"
-#include "IfxGtm_Tom_PwmHL.h"
+#ifndef PHASESHIFTTOMPWM_H_
+#define PHASESHIFTTOMPWM_H_
+
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-
+#include "Ifx_Types.h"
+#include "IfxGtm_Tom_PwmHL.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-
+typedef void                    (*IfxGtm_Tom_Pwmccx_Update)(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn,uint16 pwmsignal);
+typedef struct
+{
+    Ifx_Pwm_Mode                 mode;                 /**< \brief Pwm Mode */
+    boolean                      inverted;             /**< \brief Inverted configuration for the selected mode */
+    IfxGtm_Tom_Pwmccx_Update      set_mode;               /**< \brief update call back function for the selected mode */
+} IfxGtm_Tom_PwmCcx;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -52,7 +58,6 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMasterChannel,Ifx_TimerValue phase_shift);
+void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMasterChannel,float32 phase_shift,uint16 dutycycle);
 
-
-#endif /* PHASESHIFTPWM_H_ */
+#endif /* PHASESHIFTTOMPWM_H_ */
