@@ -30,14 +30,11 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include <PWM_GENERATOR.h>
-#include "Ifx_Types.h"
-#include "IfxGtm_Tom_Pwm.h"
-#include "IfxGtm_Atom_Pwm.h"
+
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define ISR_PRIORITY_TOM    20
-#define ISR_PRIORITY_ATOM  19    /* Interrupt priority number                    */
+
 #define CLK_FREQ           500000.0f
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
@@ -55,13 +52,9 @@ sint8 g_fadeDir2 = 1; /* Fade direction variable                      */
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-
-void setDutyCycle_tom(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle);
-void setDutyCycle_atom(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle);
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
-
 
 
 
@@ -106,6 +99,7 @@ void initAtomPwm(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* my
     IfxGtm_Atom_Pwm_init(myatomdriver, myatomconfig);                 /* Initialize the PWM                       */
     IfxGtm_Atom_Pwm_start(myatomdriver, TRUE);                         /* Start the PWM                            */
 }
+
 void fadeLED(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 step)
 {
     if((g_fadeValue + step) >= period)
@@ -117,7 +111,7 @@ void fadeLED(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriv
         g_fadeDir = 1;                                              /* Set the direction of the fade                */
     }
     g_fadeValue += g_fadeDir * step;                           /* Calculation of the new duty cycle            */
-    setDutyCycle_tom(mytomconfig,mytomdriver,g_fadeValue);                            /* Set the duty cycle of the PWM                */
+    setDutyCycle_tom(mytomdriver,g_fadeValue);                            /* Set the duty cycle of the PWM                */
 }
 
 void fadeLED2(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 step)
@@ -136,10 +130,23 @@ void fadeLED2(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myato
 
 
 /* This function sets the duty cycle of the PWM */
-void setDutyCycle_tom(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle)
+void setDutyCycle_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle)
 {
-    mytomconfig->dutyCycle = dutyCycle;                             /* Change the value of the duty cycle           */
-    IfxGtm_Tom_Pwm_init(mytomdriver, mytomconfig);                /* Re-initialize the PWM                        */
+
+    IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
+    IfxGtm_Tom_Ch_setCompareOne(mytomdriver->tom, mytomdriver->tomChannel, dutyCycle);
+    IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
+}
+void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period){
+    IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
+    IfxGtm_Tom_Ch_setCompareZero(mytomdriver->tom, mytomdriver->tomChannel, period);
+    IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
+}
+
+void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock){
+    IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
+    IfxGtm_Tom_Ch_setClockSource(mytomdriver->tom, mytomdriver->tomChannel, clock);
+    IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
 
 void setDutyCycle_atom(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle)
@@ -147,5 +154,6 @@ void setDutyCycle_atom(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driv
     myatomconfig->dutyCycle = dutyCycle;                             /* Change the value of the duty cycle           */
     IfxGtm_Atom_Pwm_init(myatomdriver, myatomconfig);                /* Re-initialize the PWM                        */
 }
+
 
 
