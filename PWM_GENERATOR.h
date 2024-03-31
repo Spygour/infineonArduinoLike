@@ -25,15 +25,15 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 #include "Ifx_Types.h"
-#include "IfxGtm_Tom_Pwm.h"
-#include "IfxGtm_Atom_Pwm.h"
+
 #ifndef PWM_AND_DIGITALREADWRITE_H_
 #define PWM_AND_DIGITALREADWRITE_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-
+#include "IfxGtm_Tom_Pwm.h"
+#include "IfxGtm_Atom_Pwm.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -55,10 +55,10 @@
 /*********************************************************************************************************************/
 void initTomPwm(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 clock,IfxGtm_Tom_ToutMap pin);
 void initAtomPwm(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomDriver,uint16 period,IfxGtm_Atom_ToutMap pin);
-void setDutyCycle_tom(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle);
+void setDutyCycle_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle);
+void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period);
+void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock);
 void setDutyCycle_atom(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle);
-void fadeLED(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 step);
-void fadeLED2(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 step);
 
 
 
