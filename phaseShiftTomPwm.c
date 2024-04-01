@@ -33,7 +33,7 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define MAX_TOM_CHANNELS 5
+#define MAX_TOM_CHANNELS
 #define PHASE_U_HS                &IfxGtm_TOM1_4_TOUT14_P00_5_OUT /* Pin driven by the PWM, P00.11                  */
 #define PHASE_V_HS                &IfxGtm_TOM1_5_TOUT15_P00_6_OUT  /* Pin driven by the PWM, P33.0                   */
 #define PHASE_W_HS                &IfxGtm_TOM1_6_TOUT16_P00_7_OUT  /* Pin driven by the PWM, P33.2                   */
@@ -66,7 +66,7 @@ Pwm3PhaseOutput g_pwm3PhaseOutput;
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 
-IFX_STATIC void IfxGtm_Tom_PwmCCX_updateOff(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn,uint16 pwmsignal)
+IFX_STATIC void IfxGtm_Tom_PwmCCX_updateOff(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
     IFX_UNUSED_PARAMETER(tOn)
     uint8 channelIndex;
@@ -77,20 +77,20 @@ IFX_STATIC void IfxGtm_Tom_PwmCCX_updateOff(IfxGtm_Tom_PwmHl *driver, Ifx_TimerV
     for (channelIndex = 0; channelIndex < driver->base.channelCount; channelIndex++)
     {
         IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex],
-            2 /* 1 will keep the previous level */, pwmsignal + 2);
+            2 /* 1 will keep the previous level */, 2 + 2);
     }
 }
 
 
 
-void IfxGtm_Tom_PwmCCX_setOnTime(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn,uint16 pwmsignal)
+void IfxGtm_Tom_PwmCCX_setOnTime(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
-    g_pwm3PhaseOutput.update.set_mode(driver, tOn,pwmsignal);
+    g_pwm3PhaseOutput.update.set_mode(driver, tOn);
 }
 
 
 
-IFX_STATIC void IfxGtm_Tom_PwmCCX_updateCenterAligned(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn,uint16 dutycycle)
+IFX_STATIC void IfxGtm_Tom_PwmCCX_updateCenterAligned(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
     uint8          channelIndex;
     Ifx_TimerValue period;
@@ -103,18 +103,10 @@ IFX_STATIC void IfxGtm_Tom_PwmCCX_updateCenterAligned(IfxGtm_Tom_PwmHl *driver, 
         Ifx_TimerValue cm0, cm1;
         x = tOn[channelIndex];
 
-        if (x == period)
-        {
-            cm0 = 1;
-            cm1 = (uint16)period + 2;
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0, cm1);
-        }
-        else
-        {                           /* x% duty cycle */
-            cm1 = x+dutycycle; // CM1
-            cm0 = x; // CM0
+                      /* x% duty cycle */
+            cm1 = x; // CM1
+            cm0 = x+(uint16)period/2; // CM0
             IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0,cm1);
-        }
     }
 }
 
@@ -139,7 +131,7 @@ boolean IfxGtm_Tom_Pwmccx_setMode(IfxGtm_Tom_PwmHl *driver, Ifx_Pwm_Mode mode)
             result = FALSE;
         }
 
-        IFX_ASSERT(IFX_VERBOSE_LEVEL_ERROR, mode == IfxGtm_Tom_PwmHl_modes[mode].mode);
+        IFX_ASSERT(IFX_VERBOSE_LEVEL_ERROR, mode == IfxGtm_Tom_Pwmccx_modes[mode].mode);
 
         base->mode             = mode;
         g_pwm3PhaseOutput.update         = IfxGtm_Tom_Pwmccx_modes[0];
@@ -173,7 +165,7 @@ boolean IfxGtm_Tom_Pwmccx_setMode(IfxGtm_Tom_PwmHl *driver, Ifx_Pwm_Mode mode)
 
 
 
-boolean IfxGtm_Tom_Pwmccx_init(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config *config,uint16 pwmSignal) {
+boolean IfxGtm_Tom_Pwmccx_init(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config *config) {
     boolean           result = TRUE;
     uint16            channelMask;
     uint16            channelsMask = 0;
@@ -189,8 +181,6 @@ boolean IfxGtm_Tom_Pwmccx_init(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config
     driver->base.coutxActiveState = config->base.coutxActiveState;
     driver->base.channelCount     = config->base.channelCount;
 
-    IfxGtm_Tom_PwmHl_setDeadtime(driver, config->base.deadtime);
-    IfxGtm_Tom_PwmHl_setMinPulse(driver, config->base.minPulse);
 
     driver->tom = &(timer->gtm->TOM[config->tom]);
 
@@ -244,7 +234,7 @@ boolean IfxGtm_Tom_Pwmccx_init(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config
     IfxGtm_Tom_Pwmccx_setMode(driver, Ifx_Pwm_Mode_off);
 
     Ifx_TimerValue tOn[MAX_TOM_CHANNELS] = {0};
-    IfxGtm_Tom_PwmCCX_updateOff(driver, tOn,pwmSignal);     /* tOn do not need defined values */
+    IfxGtm_Tom_PwmCCX_updateOff(driver, tOn);     /* tOn do not need defined values */
     /* Transfer the shadow registers */
     IfxGtm_Tom_Tgc_setChannelsForceUpdate(driver->tgc, channelsMask, 0, 0, 0);
     IfxGtm_Tom_Tgc_trigger(driver->tgc);
@@ -259,7 +249,7 @@ boolean IfxGtm_Tom_Pwmccx_init(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config
     return result;
 }
 
-void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMasterChannel,float32 phase_shift,uint16 dutycycle){
+void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMasterChannel,float32 phase_shift){
     /* Enable the GTM Module */
      IfxGtm_enable(&MODULE_GTM);
      /* Set the GTM global clock frequency in Hz */
@@ -291,8 +281,6 @@ void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMaster
          IfxGtm_Tom_PwmHl_initConfig(&pwmHlConfig);
          pwmHlConfig.base.channelCount = sizeof(ccx) / sizeof(IfxGtm_Tom_ToutMapP);
 
-         pwmHlConfig.base.deadtime = phase_shift;
-
          pwmHlConfig.base.outputMode = IfxPort_OutputMode_pushPull;
 
 
@@ -307,19 +295,19 @@ void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMaster
          pwmHlConfig.timer = &g_pwm3PhaseOutput.timer;
          pwmHlConfig.tom   = timerConfig.tom;
 
-         IfxGtm_Tom_Pwmccx_init(&g_pwm3PhaseOutput.pwm, &pwmHlConfig,dutycycle);
+         IfxGtm_Tom_Pwmccx_init(&g_pwm3PhaseOutput.pwm, &pwmHlConfig);
 
          IfxGtm_Tom_Pwmccx_setMode(&g_pwm3PhaseOutput.pwm, Ifx_Pwm_Mode_centerAligned);
          /* Update the input frequency */
          IfxGtm_Tom_Timer_updateInputFrequency(&g_pwm3PhaseOutput.timer);
          IfxGtm_Tom_Timer_run(&g_pwm3PhaseOutput.timer);
          /* Calculate initial values of PWM duty cycles */
-         g_pwm3PhaseOutput.pwmOnTimes[0] = g_pwm3PhaseOutput.pwm.timer->base.period * 0.25;
-         g_pwm3PhaseOutput.pwmOnTimes[1] = g_pwm3PhaseOutput.pwm.timer->base.period * 0.5;
-         g_pwm3PhaseOutput.pwmOnTimes[2] = g_pwm3PhaseOutput.pwm.timer->base.period * 0.75;
+         g_pwm3PhaseOutput.pwmOnTimes[0] = g_pwm3PhaseOutput.pwm.timer->base.period * 0.01;
+         g_pwm3PhaseOutput.pwmOnTimes[1] = g_pwm3PhaseOutput.pwm.timer->base.period * phase_shift;
+         g_pwm3PhaseOutput.pwmOnTimes[2] = g_pwm3PhaseOutput.pwm.timer->base.period * 2*phase_shift;
          /* Update PWM duty cycles */
          IfxGtm_Tom_Timer_disableUpdate(&g_pwm3PhaseOutput.timer);
-         IfxGtm_Tom_PwmCCX_setOnTime(&g_pwm3PhaseOutput.pwm, g_pwm3PhaseOutput.pwmOnTimes,dutycycle);
+         IfxGtm_Tom_PwmCCX_setOnTime(&g_pwm3PhaseOutput.pwm, g_pwm3PhaseOutput.pwmOnTimes);
          IfxGtm_Tom_Timer_applyUpdate(&g_pwm3PhaseOutput.timer);
 }
 
