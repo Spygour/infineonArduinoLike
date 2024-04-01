@@ -134,12 +134,12 @@ void setDutyCycle_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle)
 {
 
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
-    IfxGtm_Tom_Ch_setCompareOne(mytomdriver->tom, mytomdriver->tomChannel, dutyCycle);
+    IfxGtm_Tom_Ch_setCompareOneShadow(mytomdriver->tom, mytomdriver->tomChannel, dutyCycle);
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
 void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period){
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
-    IfxGtm_Tom_Ch_setCompareZero(mytomdriver->tom, mytomdriver->tomChannel, period);
+    IfxGtm_Tom_Ch_setCompareZeroShadow(mytomdriver->tom, mytomdriver->tomChannel, period);
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
 
