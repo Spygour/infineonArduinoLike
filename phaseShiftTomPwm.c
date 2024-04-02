@@ -29,14 +29,14 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include <ThreePhaseShift.h>
+#include <phaseShiftTomPwm.h>
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
 #define MAX_TOM_CHANNELS
-#define PHASE_U_HS                &IfxGtm_TOM1_4_TOUT14_P00_5_OUT /* Pin driven by the PWM, P00.11                  */
-#define PHASE_V_HS                &IfxGtm_TOM1_2N_TOUT15_P00_6_OUT  /* Pin driven by the PWM, P33.0                   */
-#define PHASE_W_HS                &IfxGtm_TOM1_7N_TOUT16_P00_7_OUT  /* Pin driven by the PWM, P33.2                   */
+#define PHASE_U_HS                &IfxGtm_TOM1_4_TOUT14_P00_5_OUT /* Pin driven by the PWM, P00.5                                                                                                                                                                                                                                                                                                                                                                      */
+#define PHASE_V_HS                &IfxGtm_TOM1_7_TOUT17_P00_8_OUT  /* Pin driven by the PWM, P00.6                   */
+#define PHASE_W_HS                &IfxGtm_TOM1_5_TOUT15_P00_6_OUT  /* Pin driven by the PWM, P00.7                   */
 
 
 /*********************************************************************************************************************/
@@ -99,7 +99,8 @@ IFX_STATIC void IfxGtm_Tom_PwmCCX_updateCenterAligned(IfxGtm_Tom_PwmHl *driver, 
         x = tOn[channelIndex];
         if (x+period/2>=period){
             cm1 = x;
-            cm0 = x+(period/2)-period;
+            cm0 = x+(period/2)-period+1;
+            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], cm0,cm1);
         }
         else{
                       /* x% duty cycle */
@@ -309,5 +310,4 @@ void InitChannelsPwm(float PWM_FREQ,IfxGtm_Tom tomMaster,IfxGtm_Tom_Ch tomMaster
          IfxGtm_Tom_PwmCCX_setOnTime(&g_pwm3PhaseOutput.pwm, g_pwm3PhaseOutput.pwmOnTimes);
          IfxGtm_Tom_Timer_applyUpdate(&g_pwm3PhaseOutput.timer);
 }
-
 
