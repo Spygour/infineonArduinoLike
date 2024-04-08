@@ -35,7 +35,7 @@
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
 
-#define CLK_FREQ           500000.0f
+#define CLK_FREQ           20000.0f
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -60,73 +60,48 @@ sint8 g_fadeDir2 = 1; /* Fade direction variable                      */
 
 
 /* This function initializes the TOM */
-void initTomPwm(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 clock,IfxGtm_Tom_ToutMap pin)
+void initTomPwm(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 clock,IfxGtm_Tom_ToutMap pin)
 {
+    IfxGtm_Tom_Pwm_Config mytomconfig;
     IfxGtm_enable(&MODULE_GTM);                                     /* Enable GTM                                   */
 
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);   /* Enable the FXU clock                         */
 
     /* Initialize the configuration structure with default parameters */
-    IfxGtm_Tom_Pwm_initConfig(mytomconfig, &MODULE_GTM);
+    IfxGtm_Tom_Pwm_initConfig(&mytomconfig, &MODULE_GTM);
 
-    mytomconfig->tom = pin.tom;                                      /* Select the TOM depending on the LED          */
-    mytomconfig->tomChannel = pin.channel; /* Select the channel depending on the LED      */
-    mytomconfig->clock = clock;
-    mytomconfig->period = period;                                /* Set the timer period                         */
-    mytomconfig->pin.outputPin = &pin;                               /* Set the LED port pin as output               */
-    mytomconfig->synchronousUpdateEnabled = TRUE;                    /* Enable synchronous update                    */
-
-    IfxGtm_Tom_Pwm_init(mytomdriver, mytomconfig);                /* Initialize the GTM TOM                       */
+    mytomconfig.tom = pin.tom;                                      /* Select the TOM depending on the LED          */
+    mytomconfig.tomChannel = pin.channel; /* Select the channel depending on the LED      */
+    mytomconfig.clock = clock;
+    mytomconfig.period = period;                                /* Set the timer period                         */
+    mytomconfig.pin.outputPin = &pin;                               /* Set the LED port pin as output               */
+    mytomconfig.synchronousUpdateEnabled = TRUE;                    /* Enable synchronous update                    */
+    IfxGtm_Tom_Pwm_init(mytomdriver, &mytomconfig);                /* Initialize the GTM TOM                       */
     IfxGtm_Tom_Pwm_start(mytomdriver, TRUE);                       /* Start the PWM                                */
 }
 
-void initAtomPwm(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,IfxGtm_Atom_ToutMap pin)
+void initAtomPwm(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap pin)
 {
+    IfxGtm_Atom_Pwm_Config myatomconfig;
     IfxGtm_enable(&MODULE_GTM); /* Enable GTM */
 
-    IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_0, CLK_FREQ);        /* Set the CMU clock 0 frequency    */
+    IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_5, CLK_FREQ);        /* Set the CMU clock 0 frequency    */
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_CLK0);                /* Enable the CMU clock 0           */
 
-    IfxGtm_Atom_Pwm_initConfig(myatomconfig, &MODULE_GTM);                     /* Initialize default parameters    */
+    IfxGtm_Atom_Pwm_initConfig(&myatomconfig, &MODULE_GTM);                     /* Initialize default parameters    */
 
-    myatomconfig->atom = pin.atom;    /* Select the ATOM depending on the LED     */
-    myatomconfig->atomChannel = pin.channel;                             /* Select the channel depending on the LED  */
-    myatomconfig->mode = 2;
-    myatomconfig->period = period;                                   /* Set timer period                         */
-    myatomconfig->pin.outputPin = &pin;                                  /* Set LED as output                        */
-    myatomconfig->synchronousUpdateEnabled = TRUE;                       /* Enable synchronous update                */
+    myatomconfig.atom = pin.atom;    /* Select the ATOM depending on the LED     */
+    myatomconfig.atomChannel = pin.channel;                             /* Select the channel depending on the LED  */
+    myatomconfig.mode = 2;
+    myatomconfig.period = period;                                   /* Set timer period                         */
+    myatomconfig.dutyCycle = dutyCycle;
+    myatomconfig.pin.outputPin = &pin;                                  /* Set LED as output                        */
+    myatomconfig.synchronousUpdateEnabled = TRUE;                       /* Enable synchronous update                */
 
-    IfxGtm_Atom_Pwm_init(myatomdriver, myatomconfig);                 /* Initialize the PWM                       */
+    IfxGtm_Atom_Pwm_init(myatomdriver, &myatomconfig);                 /* Initialize the PWM                       */
     IfxGtm_Atom_Pwm_start(myatomdriver, TRUE);                         /* Start the PWM                            */
 }
 
-void fadeLED(IfxGtm_Tom_Pwm_Config* mytomconfig,IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 step)
-{
-    if((g_fadeValue + step) >= period)
-    {
-        g_fadeDir = -1;                                             /* Set the direction of the fade                */
-    }
-    else if((g_fadeValue - step) <= 0)
-    {
-        g_fadeDir = 1;                                              /* Set the direction of the fade                */
-    }
-    g_fadeValue += g_fadeDir * step;                           /* Calculation of the new duty cycle            */
-    setDutyCycle_tom(mytomdriver,g_fadeValue);                            /* Set the duty cycle of the PWM                */
-}
-
-void fadeLED2(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 step)
-{
-    if((g_fadeValue2 + step) >= period)
-    {
-        g_fadeDir2 = -1;                                             /* Set the direction of the fade                */
-    }
-    else if((g_fadeValue2 - step) <= 0)
-    {
-        g_fadeDir2 = 1;                                              /* Set the direction of the fade                */
-    }
-    g_fadeValue2 += g_fadeDir2 * step;                           /* Calculation of the new duty cycle            */
-    setDutyCycle_atom(myatomconfig,myatomdriver,g_fadeValue2);                            /* Set the duty cycle of the PWM                */
-}
 
 
 /* This function sets the duty cycle of the PWM */
@@ -149,10 +124,22 @@ void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock){
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
 
-void setDutyCycle_atom(IfxGtm_Atom_Pwm_Config* myatomconfig,IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle)
+void setDutyCycle_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle)
 {
-    myatomconfig->dutyCycle = dutyCycle;                             /* Change the value of the duty cycle           */
-    IfxGtm_Atom_Pwm_init(myatomdriver, myatomconfig);                /* Re-initialize the PWM                        */
+    IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,0);
+    IfxGtm_Atom_Ch_setCompareOneShadow(myatomdriver->atom, myatomdriver->atomChannel, dutyCycle);
+    IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
+}
+void setPeriod_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period){
+    IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,0);
+    IfxGtm_Atom_Ch_setCompareZeroShadow(myatomdriver->atom, myatomdriver->atomChannel, period);
+    IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
+}
+
+void setClock_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock){
+    IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,0);
+    IfxGtm_Atom_Ch_setClockSource(myatomdriver->atom, myatomdriver->atomChannel, clock);
+    IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
 }
 
 
