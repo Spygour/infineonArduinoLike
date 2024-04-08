@@ -29,10 +29,8 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 #include <adc_uart.h>
-#include "ifxVadc_Adc.h"
-#include "ifx_Console.h"
 #include "IfxAsclin_ASC.h"
-#include "Ifx_Shell.h"
+
 /*********************************************************************************************************************/
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -42,7 +40,7 @@
 #define VADC_GROUP IfxVadc_GroupId_4 /*Single channel set*/
 #define CHANNEL_ID  4 /*Channel ID for single vadc*/
 #define CHANNEL_RESULT_REGISTER     5 /*register where you will save the result for a single channel(this is not needed */
-#define N_CHANNELS 4  /*Number of channels for the group vadc initialize*/
+#define N_CHANNELS 10  /*Number of channels for the group vadc initialize*/
 
 #define ISR_PRIORITY_ASCLIN_TX 1
 #define ISR_PRIORITY_ASCLIN_RX 2
@@ -82,7 +80,7 @@ void send_vadc_group(uint32 chnIx, uint32 adcVal);
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 /*vadc for many channels initialize and set part */
-void init_vadc_group(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup)
+void init_vadc_group(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup,uint8 channels_size)
 {
     /* Create and initialize the module configuration */
     IfxVadc_Adc_Config adcConf;                             /* Define a configuration structure for the VADC module */
@@ -112,9 +110,9 @@ void init_vadc_group(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGr
     uint32 chnIx;
 
     /* Create channel configuration */
-    IfxVadc_Adc_ChannelConfig adcChannelConf[sizeof(g_vadcChannelIDs)]; /* Define a configuration structure for the VADC channels */
+    IfxVadc_Adc_ChannelConfig adcChannelConf[channels_size]; /* Define a configuration structure for the VADC channels */
 
-    for(chnIx = 0; chnIx < N_CHANNELS; ++chnIx)
+    for(chnIx = 0; chnIx < channels_size; ++chnIx)
     {
         IfxVadc_Adc_initChannelConfig(&adcChannelConf[chnIx], &g_adcGroup);     /* Fill it with default values      */
 
@@ -230,9 +228,37 @@ void send_vadc_single(uint32 adcVal)
     UartWrite(str, TX_LENGTH);
 }
 /*uart ISR and read/write part */
-void UartWrite(char *message,Ifx_SizeT length){
-    IfxAsclin_Asc_write(&g_asc,message,&length,TIME_INFINITE);
+void UartWriteln(char *message,Ifx_SizeT length){
+    static char string[30];
+        for (Ifx_SizeT i;i<length;i++){
+            string[i] = message[i];
+        }
+        string[length]= '\n';
+        string[length+1]='\r';
+        Ifx_SizeT real_size = length+2;
+   IfxAsclin_Asc_write(&g_asc,string,&real_size,TIME_INFINITE);
 }
+
+void UartWrite(char *message,Ifx_SizeT length){
+    static char string[30];
+        for (Ifx_SizeT i;i<length;i++){
+            string[i] = message[i];
+        }
+        string[length]='\r';
+        Ifx_SizeT real_size = length+1;
+   IfxAsclin_Asc_write(&g_asc,string,&real_size,TIME_INFINITE);
+}
+void UartWriteWithChar(char *message,Ifx_SizeT length,char special_char){
+    static char string[30];
+            for (Ifx_SizeT i;i<length;i++){
+                string[i] = message[i];
+            }
+            string[length]= special_char;
+            string[length+1]='\r';
+            Ifx_SizeT real_size = length+2;
+       IfxAsclin_Asc_write(&g_asc,string,&real_size,TIME_INFINITE);
+}
+
 
 IFX_INTERRUPT(asc0TxISR, 0 , ISR_PRIORITY_ASCLIN_TX);
 
@@ -281,7 +307,7 @@ void initSerialInterface(void){
             .rxMode     = IfxPort_InputMode_pullUp,         /* RX pin                                               */
             .rts        = NULL_PTR,                         /* RTS pin not used                                     */
             .rtsMode    = IfxPort_OutputMode_pushPull,
-            .tx         = &TX_PIN,         /* Select the pin for TX connected to the USB port      */
+            .tx         = &IfxAsclin0_TX_P14_0_OUT,         /* Select the pin for TX connected to the USB port      */
             .txMode     = IfxPort_OutputMode_pushPull,      /* TX pin                                               */
             .pinDriver  = IfxPort_PadDriver_cmosAutomotiveSpeed1
     };
