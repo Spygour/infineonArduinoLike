@@ -35,8 +35,8 @@
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
-/*********************************************************************************************************************/                    /* Define the GPT12 Timer interrupt priority            */
-#define ISR_PROVIDER_GPT12_TIMER    IfxSrc_Tos_cpu0/* Interrupt provider                                   */
+/*********************************************************************************************************************/                   
+#define ISR_PROVIDER_GPT12_TIMER    IfxSrc_Tos_cpu0 /* Interrupt provider                                   */
 #define CMU_FREQ                    1000000.0f
 #define LED                         &MODULE_P00,6
 /*********************************************************************************************************************/
@@ -83,7 +83,7 @@ void initTomInterrupt(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,ui
 }
 
 
-void initTomPwmTimer(float freq, uint16 dutyCycle, uint16 clock,IfxGtm_Tom_ToutMap* pin)
+void initTomPwmTimer(float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin)
 {
 
     IfxGtm_enable(&MODULE_GTM);
@@ -99,13 +99,13 @@ void initTomPwmTimer(float freq, uint16 dutyCycle, uint16 clock,IfxGtm_Tom_ToutM
     timerConfig.triggerOut           = pin;
     timerConfig.initPins             = TRUE;
     timerConfig.base.trigger.enabled = TRUE;
-    timerConfig.base.trigger.risingEdgeAtPeriod = Ifx_ActiveState_low;
+    timerConfig.base.trigger.risingEdgeAtPeriod = Ifx_ActiveState_high;
     //timerConfig.base.trigger.triggerPoint = dutyCycle;
     timerConfig.base.countDir        = IfxStdIf_Timer_CountDir_up;
     timerConfig.base.trigger.outputDriver = IfxPort_PadDriver_cmosAutomotiveSpeed1;
     timerConfig.base.trigger.outputMode = IfxPort_OutputMode_pushPull;
     timerConfig.base.trigger.outputEnabled = TRUE;
-    timerConfig.irqModeTrigger       = IfxGtm_IrqMode_singlePulse;
+    timerConfig.irqModeTrigger       = IfxGtm_IrqMode_pulseNotify;
 
     timerConfig.base.frequency       = freq;                                /* Set timer frequency              */
     timerConfig.base.isrPriority     = 5;
@@ -117,7 +117,6 @@ void initTomPwmTimer(float freq, uint16 dutyCycle, uint16 clock,IfxGtm_Tom_ToutM
 
     IfxGtm_Tom_Timer_init(&myTestTimer, &timerConfig);                        /* Initialize the TOM               */
     IfxGtm_Tom_Timer_run(&myTestTimer); /* Start the TOM */
-
 
 }
 
