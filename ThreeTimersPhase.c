@@ -33,7 +33,7 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define MAX_TOM_CHANNELS
+#define MAX_TOM_CHANNELS            3
 #define PHASE_U_HS                IfxGtm_TOM2_0N_TOUT91_P13_0_OUT /* Pin driven by the PWM, P00.5                                                                                                                                                                                                                                                                                                                                                                      */
 #define PHASE_V_HS                &IfxGtm_TOM2_1N_TOUT92_P13_1_OUT  /* Pin driven by the PWM, P00.6                   */
 #define PHASE_W_HS                &IfxGtm_TOM2_2N_TOUT93_P13_2_OUT  /* Pin driven by the PWM, P00.7                   */
