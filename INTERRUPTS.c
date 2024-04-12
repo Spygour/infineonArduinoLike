@@ -29,23 +29,18 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "Ifx_Types.h"
-#include "IfxGpt12.h"
-#include "IfxPort.h"
-#include "IfxGtm_Atom_Timer.h"
-#include "IfxGtm_Tom_Timer.h"
 
+#include "IfxPort.h"
 #include "INTERRUPTS.h"
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/                    /* Define the GPT12 Timer interrupt priority            */
 #define ISR_PROVIDER_GPT12_TIMER    IfxSrc_Tos_cpu0/* Interrupt provider                                   */
-#define RELOAD_VALUE                48828u                  /* Reload value to have an interrupt each 500ms         */
-#define LED                         &MODULE_P00, 6          /* LED which toggles in the Interrupt Service Routine   */
-#define CMU_FREQ            1000000.0f
+#define CMU_FREQ                    1000000.0f
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
+IfxGtm_Tom_Timer myTestTimer;
 
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
@@ -56,6 +51,15 @@
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
+IFX_INTERRUPT(change_trigger,0,5);
+void change_trigger() {
+    IfxGtm_Tom_Timer_acknowledgeTimerIrq(&myTestTimer);
+    Ifx_TimerValue triggerPoint = IfxGtm_Tom_Timer_getPeriod(&myTestTimer);
+    IfxGtm_Tom_Timer_disableUpdate(&myTestTimer);
+    IfxGtm_Tom_Timer_setTrigger(&myTestTimer, triggerPoint/2);
+    IfxGtm_Tom_Timer_applyUpdate(&myTestTimer);
+}
+
 void initTomInterrupt(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,uint16 tom,uint16 channel, uint16 clock)
 {
     IfxGtm_enable(&MODULE_GTM); /* Enable GTM */
@@ -74,9 +78,46 @@ void initTomInterrupt(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,ui
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);               /* Enable the CMU clock             */
     IfxGtm_Tom_Timer_init(mytomtimer, &timerConfig);                        /* Initialize the TOM               */
 
-    IfxPort_setPinModeOutput(LED, IfxPort_OutputMode_pushPull, IfxPort_OutputIdx_general);  /* Set pin mode         */
-
     IfxGtm_Tom_Timer_run(mytomtimer); /* Start the TOM */
+}
+
+
+void initTomPwmTimer(float freq, uint16 dutyCycle, uint16 clock,IfxGtm_Tom_ToutMap* pin)
+{
+
+    IfxGtm_enable(&MODULE_GTM);
+    /* Set the GTM global clock frequency in Hz */
+    IfxGtm_Cmu_setGclkFrequency(&MODULE_GTM, IfxGtm_Cmu_getModuleFrequency(&MODULE_GTM));
+    /* Set the GTM configurable clock frequency in Hz */
+    IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_0, IfxGtm_Cmu_getGclkFrequency(&MODULE_GTM));
+    /* Enable the FXU clock                         */
+    IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);
+    IfxGtm_Tom_Timer_Config timerConfig;                                        /* Timer configuration              */
+    IfxGtm_Tom_Timer_initConfig(&timerConfig, &MODULE_GTM);                     /* Initialize timer configuration   */
+    /*init pwm*/
+    timerConfig.triggerOut           = pin;
+    timerConfig.initPins             = TRUE;
+    timerConfig.base.trigger.enabled = TRUE;
+    timerConfig.base.trigger.risingEdgeAtPeriod = Ifx_ActiveState_low;
+    //timerConfig.base.trigger.triggerPoint = dutyCycle;
+    timerConfig.base.countDir        = IfxStdIf_Timer_CountDir_up;
+    timerConfig.base.trigger.outputDriver = IfxPort_PadDriver_cmosAutomotiveSpeed1;
+    timerConfig.base.trigger.outputMode = IfxPort_OutputMode_pushPull;
+    timerConfig.base.trigger.outputEnabled = TRUE;
+    timerConfig.irqModeTrigger       = IfxGtm_IrqMode_singlePulse;
+
+    timerConfig.base.frequency       = freq;                                /* Set timer frequency              */
+    timerConfig.base.isrPriority     = 5;
+    timerConfig.base.isrProvider     = IfxSrc_Tos_cpu0;
+    timerConfig.tom                  = pin->tom;                            /* Define the timer used            */
+    timerConfig.timerChannel         = pin->channel;                         /* Define the channel used          */
+    timerConfig.clock                = clock;
+    /* Define the CMU clock used        */
+
+    IfxGtm_Tom_Timer_init(&myTestTimer, &timerConfig);                        /* Initialize the TOM               */
+    IfxGtm_Tom_Timer_run(&myTestTimer); /* Start the TOM */
+
+
 }
 
 void initAtomInterrupt(IfxGtm_Atom_Timer* mytimer,float32 frequency, uint16 priority,uint16 atom,uint16 channel, uint16 clock)
