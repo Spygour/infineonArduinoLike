@@ -27,10 +27,9 @@
 
 #ifndef INTERRUPTS_H_
 #define INTERRUPTS_H_
-#include "Ifx_Types.h"
+#include "TomAtom_cfg.h"
 #include "IfxGpt12.h"
-#include "IfxGtm_Atom_Timer.h"
-#include "IfxGtm_Tom_Timer.h"
+
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
@@ -56,9 +55,9 @@
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
 void initTomInterrupt(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,uint16 tom,uint16 channel, uint16 clock);
-void initAtomInterrupt(IfxGtm_Atom_Timer* mytimer,float32 frequency, uint16 priority,uint16 atom,uint16 channel, uint16 clock);
+void initAtomInterrupt(IfxGtm_Atom_Timer* mytimer,float32 frequency, uint16 priority,uint16 atom,uint16 channel);
 void initGpt12interrupt(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,IfxGpt12_TimerInputPrescaler timerPrescaler,uint16 priority);
 void interruptGpt12(void);
 /*Tom Pwm timer test function*/
-void initTomPwmTimer(float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin);
+void initTomPwmTimer(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin);
 #endif /* INTERRUPTS_H_ */
