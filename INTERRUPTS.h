@@ -27,8 +27,8 @@
 
 #ifndef INTERRUPTS_H_
 #define INTERRUPTS_H_
-#include "TomAtom_cfg.h"
 #include "IfxGpt12.h"
+#include "PWM_GENERATOR_cfg.h"
 
 
 /*********************************************************************************************************************/
