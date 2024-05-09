@@ -28,7 +28,7 @@
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
-#include <adc_uart.h>
+#include "adc_uart.h"
 #include "IfxAsclin_ASC.h"
 
 /*********************************************************************************************************************/
@@ -58,7 +58,7 @@ IfxVadc_Adc g_vadc;                             /* Handle for VADC registers ins
 IfxVadc_Adc_Group g_adcGroup;                   /* Handle for the VADC group registers                              */
 IfxVadc_Adc_Channel g_adcChannel[N_CHANNELS];
 
-
+uint8 SerialPrinBuffer[128] = {''};
 
 uint8 g_uartTxBuffer[ASC_TX_BUFFER_SIZE + sizeof(Ifx_Fifo) + 8];
 uint8 g_uartRxBuffer[ASC_RX_BUFFER_SIZE + sizeof(Ifx_Fifo) + 8];
@@ -72,8 +72,8 @@ ApplicationVadcBackgroundScan g_vadcBackgroundScan;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void initSerialInterface(void);
-void UartWrite(char *message,Ifx_SizeT length);
+void InitSerialInterface(void);
+void UartWrite(uint8 *message,Ifx_SizeT length);
 void send_vadc_single(uint32 adcVal);
 void send_vadc_group(uint32 chnIx, uint32 adcVal);
 /*********************************************************************************************************************/
@@ -152,16 +152,16 @@ void run_vadc_group(uint32 channels)
 }
 void send_vadc_group(uint32 chnIx, uint32 adcVal)
 {
-    char str[12] = {'C','h','.','X',':',' ','X','X','X','X','\n','\r'};  /* X to be replaced by correct values*/
+    uint8 str[12] = {'C','h','.','X',':',' ','X','X','X','X','\n','\r'};  /* X to be replaced by correct values*/
 
-    str[3] = (char) chnIx + 48;                                        /* Channel index                    */
+    str[3] = (uint8) chnIx + 48;                                        /* Channel index                    */
 
     /* Turns the digital converted value into its ASCII characters, e.g. 1054 -> '1','0','5','4' */
     /* 12-bits range value: 0-4095 */
-    str[6] = (char)(adcVal / 1000) + 48;                                     /* Thousands                        */
-    str[7] = (char)((adcVal % 1000) / 100) + 48;                             /* Hundreds                         */
-    str[8] = (char)((adcVal % 100) / 10) + 48;                               /* Tens                             */
-    str[9] = (char)(adcVal % 10) + 48;                                       /* Units                            */
+    str[6] = (uint8)(adcVal / 1000) + 48;                                     /* Thousands                        */
+    str[7] = (uint8)((adcVal % 1000) / 100) + 48;                             /* Hundreds                         */
+    str[8] = (uint8)((adcVal % 100) / 10) + 48;                               /* Tens                             */
+    str[9] = (uint8)(adcVal % 10) + 48;                                       /* Units                            */
 
     /* Print via UART */
     UartWrite(str, 12);
@@ -214,49 +214,57 @@ void run_vadc_background(void){
 
 void send_vadc_single(uint32 adcVal)
 {
-    char str[TX_LENGTH] = {'X','X','X','X','\n','\r'};  /* X to be replaced by correct values*/
+    uint8 str[TX_LENGTH] = {'X','X','X','X','\n','\r'};  /* X to be replaced by correct values*/
                                     /* Channel index                    */
 
     /* Turns the digital converted value into its ASCII characters, e.g. 1054 -> '1','0','5','4' */
     /* 12-bits range value: 0-4095 */
-    str[0] = (char)(adcVal / 1000) + 48;                                     /* Thousands                        */
-    str[1] = (char)((adcVal % 1000) / 100) + 48;                             /* Hundreds                         */
-    str[2] = (char)((adcVal % 100) / 10) + 48;                               /* Tens                             */
-    str[3] = (char)(adcVal % 10) + 48;                                       /* Units                            */
+    str[0] = (uint8)(adcVal / 1000) + 48;                                     /* Thousands                        */
+    str[1] = (uint8)((adcVal % 1000) / 100) + 48;                             /* Hundreds                         */
+    str[2] = (uint8)((adcVal % 100) / 10) + 48;                               /* Tens                             */
+    str[3] = (uint8)(adcVal % 10) + 48;                                       /* Units                            */
 
     /* Print via UART */
     UartWrite(str, TX_LENGTH);
 }
 /*uart ISR and read/write part */
-void UartWriteln(char *message,Ifx_SizeT length){
-    static char string[30];
-        for (Ifx_SizeT i;i<length;i++){
-            string[i] = message[i];
-        }
-        string[length]= '\n';
-        string[length+1]='\r';
-        Ifx_SizeT real_size = length+2;
-   IfxAsclin_Asc_write(&g_asc,string,&real_size,TIME_INFINITE);
+
+void UartWriteWord(uint8 *message,Ifx_SizeT length)
+{
+    IfxAsclin_Asc_write(&g_asc,message,&length,TIME_INFINITE);
 }
 
-void UartWrite(char *message,Ifx_SizeT length){
-    static char string[30];
-        for (Ifx_SizeT i;i<length;i++){
-            string[i] = message[i];
+void UartWriteln(uint8 *message,Ifx_SizeT length)
+{
+        for (Ifx_SizeT i=0;i<length;i++){
+            SerialPrinBuffer[i] = message[i];
         }
-        string[length]='\r';
-        Ifx_SizeT real_size = length+1;
-   IfxAsclin_Asc_write(&g_asc,string,&real_size,TIME_INFINITE);
+        SerialPrinBuffer[length-1] = '\r';
+        SerialPrinBuffer[length] = '\n';
+        SerialPrinBuffer[length+1] = '\0';
+        Ifx_SizeT real_size = length+2;
+   IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
 }
-void UartWriteWithChar(char *message,Ifx_SizeT length,char special_char){
-    static char string[30];
-            for (Ifx_SizeT i;i<length;i++){
-                string[i] = message[i];
+
+void UartWrite(uint8 *message,Ifx_SizeT length)
+{
+        for (Ifx_SizeT i=0;i<length;i++){
+            SerialPrinBuffer[i] = message[i];
+        }
+        SerialPrinBuffer[length-1] = '\r';
+        SerialPrinBuffer[length] = '\0';
+        Ifx_SizeT real_size = length+1;
+   IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
+}
+void UartWriteWithChar(uint8 *message,Ifx_SizeT length,char special_char){
+            for (Ifx_SizeT i=0;i<length;i++){
+                SerialPrinBuffer[i] = message[i];
             }
-            string[length]= special_char;
-            string[length+1]='\r';
+            SerialPrinBuffer[length-1] = '\r';
+            SerialPrinBuffer[length] = special_char;
+            SerialPrinBuffer[length+1] = '\0';
             Ifx_SizeT real_size = length+2;
-       IfxAsclin_Asc_write(&g_asc,string,&real_size,TIME_INFINITE);
+       IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
 }
 
 
@@ -278,13 +286,13 @@ void asc0ErISR(void){
     IfxAsclin_Asc_isrError(&g_asc);
 }
 
-void receive_data(char *data, Ifx_SizeT length)
+void receive_data(uint8 *data, Ifx_SizeT length)
 {
     /* Receive data */
     IfxAsclin_Asc_read(&g_asc, data, &length, TIME_INFINITE);
 }
 /*Uart initialize with USB*/
-void initSerialInterface(void){
+void InitSerialInterface(void){
     IfxAsclin_Asc_Config ascConf;
     IfxAsclin_Asc_initModuleConfig(&ascConf, TX_PIN.module);
 
