@@ -51,7 +51,7 @@ IfxGtm_Tom_Timer myTestExample;
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 /*Example regarding the interrupt using the tom timer*/
-IFX_INTERRUPT(test_function,0,5);
+IFX_INTERRUPT(test_function,0,10);
 void test_function(){
     IfxGtm_Tom_Timer_acknowledgeTimerIrq(&myTestExample); /*acknowledge the timer used. For the ATOM we use IfxGtm_Atom_Timer_acknowledgeTimerIrq(&myatomdriver)*/
     /*The code you should write*/
