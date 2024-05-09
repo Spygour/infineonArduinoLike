@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file PWM_AND_digitalReadWrite.h
+ * \file Serialinit.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -25,16 +25,14 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-
-#ifndef PWM_AND_DIGITALREADWRITE_H_
-#define PWM_AND_DIGITALREADWRITE_H_
+#ifndef SERIALINIT_H_
+#define SERIALINIT_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
+#include "IfxAsclin_ASC.h"
 #include "Ifx_Types.h"
-#include "IfxGtm_Tom_Pwm.h"
-#include "IfxGtm_Atom_Pwm.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -54,14 +52,26 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void initTomPwm(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 clock,IfxGtm_Tom_ToutMap* pin);
-void initAtomPwm(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin);
-void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period);
-void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock);
-void setPeriod_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period);
-void setClock_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock);
-void setDutyCycle_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle);
-void setDutyCycle_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle);
+void SerialReadnl(Ifx_SizeT length);
+void SerialReadwithChar(Ifx_SizeT length);
+void SerialRead(Ifx_SizeT length);
+void SerialReadChar(void);
+void SerialWritenl(uint8 *message,Ifx_SizeT length);
+void SerialWriteWithChar(uint8 *message,Ifx_SizeT length,uint8 special_char);
+void SerialWrite(uint8 *message,Ifx_SizeT length);
+void UartInit(IfxAsclin_Rx_In* RX_PIN,IfxAsclin_Tx_Out* TX_PIN,float32 baudrate);
+void SerialWriteChar(uint8 write_char);
+void SerialWriteString(uint8* write_string,Ifx_SizeT length);
+void SerialReadString(Ifx_SizeT length);
 
+/*Read messages compare functions*/
+boolean charCmp(uint8 chr);
+boolean strcmp(uint8* message,uint8* read_string,Ifx_SizeT message_len);
+boolean SerialCmpCmd(uint8* message,Ifx_SizeT message_len);
+boolean SerialCmpchar(uint8* message,Ifx_SizeT message_len,uint8 compareChar);
+boolean SerialCmpNl(uint8* message,Ifx_SizeT message_len);
+boolean SerialCmpString(uint8* message,Ifx_SizeT message_len);
 
-#endif /* PWM_AND_DIGITALREADWRITE_H_ */
+/*Read-Write buffer return function */
+uint8 Get_readBuf(Ifx_SizeT index);
+#endif /* SERIALINIT_H_ */

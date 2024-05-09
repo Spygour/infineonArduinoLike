@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file PWM_AND_digitalReadWrite.h
+ * \file TomAtom_cfg.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -25,16 +25,16 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-
-#ifndef PWM_AND_DIGITALREADWRITE_H_
-#define PWM_AND_DIGITALREADWRITE_H_
+#ifndef PWM_GENERATOR_CFG_H_
+#define PWM_GENERATOR_CFG_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "Ifx_Types.h"
-#include "IfxGtm_Tom_Pwm.h"
-#include "IfxGtm_Atom_Pwm.h"
+#include "IfxGpt12.h"
+#include "IfxGtm_Atom_Timer.h"
+#include "IfxGtm_Tom_Timer.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -54,14 +54,10 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void initTomPwm(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 clock,IfxGtm_Tom_ToutMap* pin);
-void initAtomPwm(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin);
-void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period);
-void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock);
-void setPeriod_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period);
-void setClock_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock);
-void setDutyCycle_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle);
-void setDutyCycle_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle);
-
-
-#endif /* PWM_AND_DIGITALREADWRITE_H_ */
+void setTomConfig(float freq,uint16 priority,uint16 tom,uint16 channel, uint16 clock,Ifx_GTM *GTM);
+void setAtomConfig(float32 frequency, uint16 priority,uint16 atom,uint16 channel, uint16 clock,Ifx_GTM *GTM);
+void setTomPwm(float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin,Ifx_GTM *GTM);
+void setTomDriver(IfxGtm_Tom_Timer *mytomtimer);
+void setAtomDriver(IfxGtm_Atom_Timer *myatomtimer);
+void setTomPwmDriver(IfxGtm_Tom_Timer *mytomtimer);
+#endif /* PWM_GENERATOR_CFG_H_ */
