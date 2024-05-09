@@ -53,13 +53,14 @@ typedef struct
 void init_vadc_background(IfxVadc_GroupId vadc_group,IfxVadc_ChannelId channel_id,IfxVadc_ChannelResult result_register);
 void run_vadc_background(void);
 void send_vadc_single(uint32 adcVal);
-void initSerialInterface(void);
-void UartWrite(char *data, Ifx_SizeT length);
-void UartWriteln(char *message,Ifx_SizeT length);
-void receive_data(char *data, Ifx_SizeT length);
+void InitSerialInterface(void);
+void UartWriteWord(uint8 *message,Ifx_SizeT length);
+void UartWrite(uint8 *data, Ifx_SizeT length);
+void UartWriteln(uint8 *message,Ifx_SizeT length);
+void receive_data(uint8 *data, Ifx_SizeT length);
 void init_vadc_group(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup,uint8 channels_size);
 void run_vadc_group(uint32 channels);
 void send_vadc_group(uint32 chnIx, uint32 adcVal);
-void UartWriteWithChar(char *message,Ifx_SizeT length,char special_char);
+void UartWriteWithChar(uint8 *message,Ifx_SizeT length,char special_char);
 
 #endif /* ADC_UART_H_ */
