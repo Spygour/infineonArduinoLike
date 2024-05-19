@@ -60,47 +60,28 @@ sint8 g_fadeDir2 = 1; /* Fade direction variable                      */
 
 
 /* This function initializes the TOM */
-void initTomPwm(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 clock,IfxGtm_Tom_ToutMap* pin)
+void initTomPwm(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin)
 {
-    IfxGtm_Tom_Pwm_Config mytomconfig;
     IfxGtm_enable(&MODULE_GTM);                                     /* Enable GTM                                   */
 
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);   /* Enable the FXU clock                         */
 
     /* Initialize the configuration structure with default parameters */
-    IfxGtm_Tom_Pwm_initConfig(&mytomconfig, &MODULE_GTM);
-
-    mytomconfig.tom = pin->tom;                                      /* Select the TOM depending on the LED          */
-    mytomconfig.tomChannel = pin->channel;                           /* Select the channel depending on the LED      */
-    mytomconfig.clock = clock;
-    mytomconfig.period = period;                                /* Set the timer period                         */
-    mytomconfig.pin.outputPin = pin;                               /* Set the LED port pin as output               */
-    mytomconfig.synchronousUpdateEnabled = TRUE;                    /* Enable synchronous update                    */
-    mytomconfig.immediateStartEnabled = FALSE;                  /* immediateStart blocks the force start            */
-    IfxGtm_Tom_Pwm_init(mytomdriver, &mytomconfig);                /* Initialize the GTM TOM                       */
-    IfxGtm_Tom_Pwm_start(mytomdriver, TRUE);                       /* Start the PWM                                */
+    initTomPwmConfig(period,dutyCycle,clock,pin,&MODULE_GTM);
+    initTomPwmDriver(mytomdriver);            /* Initialize the PWM                       */
 }
 
 void initAtomPwm(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin)
 {
-    IfxGtm_Atom_Pwm_Config myatomconfig;
     IfxGtm_enable(&MODULE_GTM); /* Enable GTM */
 
     IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_5, CLK_FREQ);        /* Set the CMU clock 0 frequency    */
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_CLK0);                /* Enable the CMU clock 0           */
 
-    IfxGtm_Atom_Pwm_initConfig(&myatomconfig, &MODULE_GTM);                     /* Initialize default parameters    */
+    initAtomPwmConfig(period,dutyCycle,pin,&MODULE_GTM);
 
-    myatomconfig.atom = pin->atom;    /* Select the ATOM depending on the LED     */
-    myatomconfig.atomChannel = pin->channel;                             /* Select the channel depending on the LED  */
-    myatomconfig.mode = 2;
-    myatomconfig.period = period;                                   /* Set timer period                         */
-    myatomconfig.dutyCycle = dutyCycle;
-    myatomconfig.pin.outputPin = pin;                                  /* Set LED as output                        */
-    myatomconfig.synchronousUpdateEnabled = TRUE;                       /* Enable synchronous update                */
+    initAtomPwmDriver(myatomdriver);            /* Initialize the PWM                       */
 
-    IfxGtm_Atom_Pwm_init(myatomdriver, &myatomconfig);                 /* Initialize the PWM                       */
-    IfxGtm_Atom_Pwm_start(myatomdriver, TRUE);                         /* Start the PWM                            */
 }
 
 
