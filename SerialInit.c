@@ -29,7 +29,7 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include <SerialInit.h>
+#include "SerialInit.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -61,6 +61,7 @@ IfxAsclin_Asc uart_driver;
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 
+
 uint8 Get_readBuf(Ifx_SizeT index)
 {
     return read_buffer[index];
@@ -73,6 +74,12 @@ static inline void RstReadBuf(void)
     }
 }
 
+static inline void RstWriteBuf(void)
+{
+    for(Ifx_SizeT i=0;i<sizeof(read_buffer);i++){
+            write_buffer[i] = '\0';
+        }
+}
 boolean charCmp(uint8 chr)
 {
     if(read_buffer[0]== chr)
@@ -103,7 +110,7 @@ boolean strcmp(uint8* message,uint8* read_string,Ifx_SizeT message_len)
 
 boolean SerialCmpString(uint8* message,Ifx_SizeT message_len)
 {
-    for(Ifx_SizeT i=0;i<message_len-1;i++)
+    for(Ifx_SizeT i=0;i<message_len;i++)
        {
            if(read_buffer[i]!=message[i])
            {
@@ -199,46 +206,57 @@ boolean SerialCmpNl(uint8* message,Ifx_SizeT message_len)
 
 void SerialWritenl(uint8 *message,Ifx_SizeT length)
 {
-        for(Ifx_SizeT i=0;i<length;i++){
-            write_buffer[i] = message[i];
-        }
-        write_buffer[length-1]= '\r';
-        write_buffer[length]='\n';
-        write_buffer[length+1] = '\0';
-        Ifx_SizeT real_size = length+2;
+    RstWriteBuf();
+    for(Ifx_SizeT i=0;i<length;i++)
+    {
+        write_buffer[i] = message[i];
+    }
+    write_buffer[length-1]= '\r';
+    write_buffer[length]='\n';
+    write_buffer[length+1] = '\0';
+    Ifx_SizeT real_size = length+2;
      IfxAsclin_Asc_write(&uart_driver,write_buffer,&real_size,TIME_INFINITE);
 }
 
 void SerialWrite(uint8 *message,Ifx_SizeT length)
 {
-        for (Ifx_SizeT i=0;i<length;i++){
-            write_buffer[i] = message[i];
-        }
-        write_buffer[length-1]='\r';
-        write_buffer[length] = '\0';
-        Ifx_SizeT real_size = length+1;
-     IfxAsclin_Asc_write(&uart_driver,write_buffer,&real_size,TIME_INFINITE);
+    RstWriteBuf();
+    for (Ifx_SizeT i=0;i<length;i++)
+    {
+        write_buffer[i] = message[i];
+    }
+    write_buffer[length-1]='\r';
+    write_buffer[length] = '\0';
+    Ifx_SizeT real_size = length+1;
+    IfxAsclin_Asc_write(&uart_driver,write_buffer,&real_size,TIME_INFINITE);
 }
 
 void SerialWriteWithChar(uint8 *message,Ifx_SizeT length,uint8 special_char)
 {
-        for (Ifx_SizeT i=0;i<length;i++)
-        {
-            write_buffer[i] = message[i];
-        }
-        write_buffer[length-1]= special_char;
-        write_buffer[length]='\r';
-        write_buffer[length+1] = '\0';
-        Ifx_SizeT real_size = length+2;
-     IfxAsclin_Asc_write(&uart_driver,write_buffer,&real_size,TIME_INFINITE);
+    RstWriteBuf();
+    for (Ifx_SizeT i=0;i<length;i++)
+    {
+        write_buffer[i] = message[i];
+    }
+    write_buffer[length-1]= special_char;
+    write_buffer[length]='\r';
+    write_buffer[length+1] = '\0';
+    Ifx_SizeT real_size = length+2;
+    IfxAsclin_Asc_write(&uart_driver,write_buffer,&real_size,TIME_INFINITE);
 }
 void SerialWriteString(uint8* write_string,Ifx_SizeT length)
 {
-    IfxAsclin_Asc_write(&uart_driver,write_string,&length,TIME_INFINITE);
+    RstWriteBuf();
+    for (Ifx_SizeT i=0;i<length;i++)
+       {
+           write_buffer[i] = write_string[i];
+       }
+    IfxAsclin_Asc_write(&uart_driver,write_buffer,&length,TIME_INFINITE);
 }
 
 void SerialWriteChar(uint8 write_char)
 {
+    RstWriteBuf();
     write_buffer[0] = write_char;
     Ifx_SizeT real_size = 1;
     IfxAsclin_Asc_write(&uart_driver,write_buffer,&real_size,TIME_INFINITE);
@@ -281,6 +299,20 @@ void SerialReadString(Ifx_SizeT length)
     IfxAsclin_Asc_read(&uart_driver, read_buffer, &length, TIME_INFINITE);
 }
 /*UART ISR and read/write part */
+void SerialremoveReadFifo(void)
+{
+    uint8 endChar = 10;
+    for(Ifx_SizeT i=0;i<128;i++)
+    {
+        SerialReadChar();
+        if(charCmp(endChar))
+
+           {
+            break;
+           }
+    }
+}
+
 
 IFX_INTERRUPT(SerialTxISR, 0 , ISR_PRIORITY_Serial_TX);
 
