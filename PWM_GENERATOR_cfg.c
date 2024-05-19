@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file TomAtom_cfg.c
+ * \file PWM_GENERATOR_cfg.c
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -29,7 +29,7 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include <PWM_GENERATOR_cfg.h>
+#include "PWM_GENERATOR_cfg.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -37,9 +37,8 @@
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
-IfxGtm_Tom_Timer_Config tomConfig;
-IfxGtm_Tom_Timer_Config tomPwmConfig;
-IfxGtm_Atom_Timer_Config atomConfig;
+IfxGtm_Tom_Pwm_Config tomPwmConfig;
+IfxGtm_Atom_Pwm_Config atomPwmConfig;
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -51,101 +50,59 @@ IfxGtm_Atom_Timer_Config atomConfig;
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
-void setTomConfig(float freq,uint16 priority,uint16 tom,uint16 channel, uint16 clock,Ifx_GTM *GTM)
+void initTomPwmConfig(uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin,Ifx_GTM *gtm)
 {
-    tomConfig.base.frequency       = freq;
-    tomConfig.base.isrPriority     = priority;                        /* Set interrupt priority           */
-    tomConfig.base.isrProvider     = IfxSrc_Tos_cpu0;                         /* Set interrupt provider           */
-    tomConfig.base.minResolution              = 0;
-    tomConfig.base.trigger.outputMode         = IfxPort_OutputMode_pushPull;
-    tomConfig.base.trigger.outputDriver       = IfxPort_PadDriver_cmosAutomotiveSpeed1;
-    tomConfig.base.trigger.risingEdgeAtPeriod = FALSE;
-    tomConfig.base.trigger.outputEnabled      = FALSE;
-    tomConfig.base.trigger.enabled            = FALSE;
-    tomConfig.base.trigger.triggerPoint       = 0;
-    tomConfig.base.trigger.isrPriority        = 0;
-    tomConfig.base.trigger.isrProvider        = IfxSrc_Tos_cpu0;
-    tomConfig.base.countDir                   = IfxStdIf_Timer_CountDir_up;
-    tomConfig.base.startOffset                = 0.0;
-    tomConfig.gtm            = GTM;
-    tomConfig.tom            = tom;                            /* Define the timer used            */
-    tomConfig.timerChannel   = channel;                         /* Define the channel used          */
-    tomConfig.triggerOut     = NULL_PTR;
-    tomConfig.clock          = clock;
-    tomConfig.base.countDir  = IfxStdIf_Timer_CountDir_up;
-    tomConfig.irqModeTimer   = IfxGtm_IrqMode_level;
-    tomConfig.irqModeTrigger = IfxGtm_IrqMode_level;
-    tomConfig.initPins       = TRUE;
+    tomPwmConfig.gtm                      = gtm;
+    tomPwmConfig.tom                      = pin->tom;
+    tomPwmConfig.tomChannel               = pin->channel;
+    tomPwmConfig.clock                    = clock;
+    tomPwmConfig.period                   = period;
+    tomPwmConfig.dutyCycle                = dutyCycle;
+    tomPwmConfig.signalLevel              = Ifx_ActiveState_high;
+    tomPwmConfig.oneShotModeEnabled       = FALSE;
+    tomPwmConfig.synchronousUpdateEnabled = TRUE;
+    tomPwmConfig.immediateStartEnabled    = FALSE;
+    tomPwmConfig.interrupt.ccu0Enabled    = FALSE;
+    tomPwmConfig.interrupt.ccu1Enabled    = FALSE;
+    tomPwmConfig.interrupt.mode           = IfxGtm_IrqMode_pulseNotify;
+    tomPwmConfig.interrupt.isrProvider    = IfxSrc_Tos_cpu0;
+    tomPwmConfig.interrupt.isrPriority    = 0;
+    tomPwmConfig.pin.outputPin            = pin;
+    tomPwmConfig.pin.outputMode           = IfxPort_OutputMode_pushPull;
+    tomPwmConfig.pin.padDriver            = IfxPort_PadDriver_cmosAutomotiveSpeed1;
 }
 
-void setAtomConfig(float32 frequency, uint16 priority,uint16 atom,uint16 channel, uint16 clock,Ifx_GTM *GTM)
+void initAtomPwmConfig(uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin,Ifx_GTM *gtm)
 {
-    atomConfig.base.frequency                  = frequency;
-    atomConfig.base.isrPriority                = priority;
-    atomConfig.base.isrProvider                = IfxSrc_Tos_cpu0;
-    atomConfig.base.minResolution              = 0;
-    atomConfig.base.trigger.outputMode         = IfxPort_OutputMode_pushPull;
-    atomConfig.base.trigger.outputDriver       = IfxPort_PadDriver_cmosAutomotiveSpeed1;
-    atomConfig.base.trigger.risingEdgeAtPeriod = FALSE;
-    atomConfig.base.trigger.outputEnabled      = FALSE;
-    atomConfig.base.trigger.enabled            = FALSE;
-    atomConfig.base.trigger.triggerPoint       = 0;
-    atomConfig.base.trigger.isrPriority        = 0;
-    atomConfig.base.trigger.isrProvider        = IfxSrc_Tos_cpu0;
-    atomConfig.base.countDir                   = IfxStdIf_Timer_CountDir_up;
-    atomConfig.base.startOffset                        = 0.0;
-    atomConfig.gtm            = GTM;
-    atomConfig.atom           = atom;
-    atomConfig.timerChannel   = channel;
-    atomConfig.triggerOut     = NULL_PTR;
-    atomConfig.clock          = clock;
-    atomConfig.base.countDir  = IfxStdIf_Timer_CountDir_up;
-    atomConfig.irqModeTimer   = IfxGtm_IrqMode_level;
-    atomConfig.irqModeTrigger = IfxGtm_IrqMode_level;
-    atomConfig.initPins       = TRUE;
+    atomPwmConfig.gtm                      = gtm;
+    atomPwmConfig.atom                     = pin->atom;
+    atomPwmConfig.atomChannel              = pin->channel;
+    atomPwmConfig.period                   = period;
+    atomPwmConfig.dutyCycle                = dutyCycle;
+    atomPwmConfig.signalLevel              = Ifx_ActiveState_high;
+    atomPwmConfig.mode                     = IfxGtm_Atom_Mode_outputPwm;
+    atomPwmConfig.oneShotModeEnabled       = FALSE;
+    atomPwmConfig.synchronousUpdateEnabled = TRUE;
+    atomPwmConfig.immediateStartEnabled    = FALSE;
+    atomPwmConfig.interrupt.ccu0Enabled    = FALSE;
+    atomPwmConfig.interrupt.ccu1Enabled    = FALSE;
+    atomPwmConfig.interrupt.mode           = IfxGtm_IrqMode_pulseNotify;
+    atomPwmConfig.interrupt.isrProvider    = IfxSrc_Tos_cpu0;
+    atomPwmConfig.interrupt.isrPriority    = 0;
+    atomPwmConfig.pin.outputPin            = pin;
+    atomPwmConfig.pin.outputMode           = IfxPort_OutputMode_pushPull;
+    atomPwmConfig.pin.padDriver            = IfxPort_PadDriver_cmosAutomotiveSpeed1;
 }
 
-void setTomPwm(float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin,Ifx_GTM *GTM)
+void initTomPwmDriver(IfxGtm_Tom_Pwm_Driver *Tomdriver)
 {
-    tomPwmConfig.base.frequency       = freq;
-    tomPwmConfig.base.isrPriority     = 0;                        /* Set interrupt priority           */
-    tomPwmConfig.base.isrProvider     = IfxSrc_Tos_cpu0;                         /* Set interrupt provider           */
-    tomPwmConfig.base.minResolution              = 0;
-    tomPwmConfig.base.trigger.outputMode         = IfxPort_OutputMode_pushPull;
-    tomPwmConfig.base.trigger.outputDriver       = IfxPort_PadDriver_cmosAutomotiveSpeed1;
-    tomPwmConfig.base.trigger.risingEdgeAtPeriod = Ifx_ActiveState_high;
-    tomPwmConfig.base.trigger.outputEnabled      = TRUE;
-    tomPwmConfig.base.trigger.enabled            = TRUE;
-    tomPwmConfig.base.trigger.triggerPoint       = 0;
-    tomPwmConfig.base.trigger.isrPriority        = 0;
-    tomPwmConfig.base.trigger.isrProvider        = IfxSrc_Tos_cpu0;
-    tomPwmConfig.base.startOffset                = 0.0;
-    tomPwmConfig.gtm            = GTM;
-    tomPwmConfig.tom            = pin->tom;                            /* Define the timer used            */
-    tomPwmConfig.timerChannel   = pin->channel;                         /* Define the channel used          */
-    tomPwmConfig.triggerOut     = pin;
-    tomPwmConfig.clock          = clock;
-    tomPwmConfig.base.countDir  = IfxStdIf_Timer_CountDir_up;
-    tomPwmConfig.irqModeTimer   = IfxGtm_IrqMode_level;
-    tomPwmConfig.irqModeTrigger = IfxGtm_IrqMode_pulseNotify;
-    tomPwmConfig.initPins       = TRUE;
+    IfxGtm_Tom_Pwm_init(Tomdriver, &tomPwmConfig);                 /* Initialize the PWM                       */
+    IfxGtm_Tom_Pwm_start(Tomdriver, TRUE);                         /* Start the PWM                            */
 }
 
-void setTomDriver(IfxGtm_Tom_Timer *mytomtimer)
+void initAtomPwmDriver(IfxGtm_Atom_Pwm_Driver *Atomdriver)
 {
-    IfxGtm_Tom_Timer_init(mytomtimer, &tomConfig);                        /* Initialize the TOM               */
+    IfxGtm_Atom_Pwm_init(Atomdriver, &atomPwmConfig);                 /* Initialize the PWM                       */
+    IfxGtm_Atom_Pwm_start(Atomdriver, TRUE);
 }
 
-void setAtomDriver(IfxGtm_Atom_Timer *myatomtimer)
-{
-    IfxGtm_Atom_Timer_init(myatomtimer, &atomConfig);                        /* Initialize the ATOM               */
-}
-
-void setTomPwmDriver(IfxGtm_Tom_Timer *mytomtimer)
-{
-    IfxGtm_Tom_Timer_init(mytomtimer,&tomPwmConfig);
-    Ifx_TimerValue triggerPoint = IfxGtm_Tom_Timer_getPeriod(mytomtimer);
-    IfxGtm_Tom_Timer_disableUpdate(mytomtimer);
-    IfxGtm_Tom_Timer_setTrigger(mytomtimer, triggerPoint/2);
-    IfxGtm_Tom_Timer_applyUpdate(mytomtimer);
-}
