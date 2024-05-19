@@ -1,5 +1,4 @@
 /**********************************************************************************************************************
- * \file TimerTom.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -28,7 +27,7 @@
 #ifndef INTERRUPTS_H_
 #define INTERRUPTS_H_
 #include "IfxGpt12.h"
-#include "PWM_GENERATOR_cfg.h"
+#include "INTERRUPTS_cfg.h"
 
 
 /*********************************************************************************************************************/
