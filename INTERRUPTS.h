@@ -63,4 +63,9 @@ void initGpt12interrupt(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,
 void interruptGpt12(void);
 /*Tom Pwm timer test function*/
 void initTomPwmTimer(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin);
+void TomTimer_SetDutyCycle(IfxGtm_Tom_Timer *mytomtimer, uint16 DutyCycle);
+void TomTimer_SetPeriod(IfxGtm_Tom_Timer *mytomtimer,uint32 Period);
+void AtomTimer_SetDutyCycle(IfxGtm_Atom_Timer *myatomtimer, uint16 DutyCycle);
+void AtomTimer_SetPeriod(IfxGtm_Atom_Timer *myatomtimer,uint32 Period);
+
 #endif /* INFINEONARDUINOLIKE_INTERRUPTS_H_ */
