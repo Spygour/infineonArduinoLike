@@ -269,8 +269,8 @@ void TomTimer_SetPeriod(IfxGtm_Tom_Timer *mytomtimer,uint32 Period)
 
 void AtomTimer_SetDutyCycle(IfxGtm_Atom_Timer *myatomtimer, uint16 DutyCycle)
 {
-  uint16 ActlPeriod = (uint16)IfxGtm_Atom_Timer_getPeriod(myatomtimer);
-  uint16 ActlDutyCycle = DutyCycle*ActlPeriod/100;
+  uint32 ActlPeriod = IfxGtm_Atom_Timer_getPeriod(myatomtimer);
+  uint32 ActlDutyCycle = DutyCycle*ActlPeriod/100;
 
   IfxGtm_Atom_Timer_disableUpdate(myatomtimer);
   IfxGtm_Atom_Ch_setCompareOneShadow(myatomtimer->atom, myatomtimer->timerChannel, ActlDutyCycle);
@@ -280,18 +280,19 @@ void AtomTimer_SetDutyCycle(IfxGtm_Atom_Timer *myatomtimer, uint16 DutyCycle)
 
 void AtomTimer_SetPeriod(IfxGtm_Atom_Timer *myatomtimer,uint32 Period)
 {
-  IfxGtm_Cmu_Clk clock = 0;
-  uint16 DutyCycle = (uint16)(IfxGtm_Atom_Ch_getCompareOne(myatomtimer->atom, myatomtimer->timerChannel)*100/IfxGtm_Atom_Timer_getPeriod(myatomtimer));
-  uint16 Prescaler[5] = {1, 16, 256, 4096, 32768};
+  IfxGtm_Cmu_Clk clock = IfxGtm_Atom_Ch_getClockSource(myatomtimer->atom, myatomtimer->timerChannel);
+  uint32 DutyCycle = (IfxGtm_Atom_Ch_getCompareOne(myatomtimer->atom, myatomtimer->timerChannel)*100/IfxGtm_Atom_Timer_getPeriod(myatomtimer));
   uint32 ActlPeriod = Period*100;
-  uint16 ActlDutyCycle;
-
-  while(ActlPeriod > 0xFFFF)
+  uint32 ActlDutyCycle;
+  ActlDutyCycle = (DutyCycle*ActlPeriod/100);
+  if (clock == IfxGtm_Cmu_Clk_7)
   {
-    ActlPeriod = ActlPeriod/Prescaler[clock];
+    clock = IfxGtm_Cmu_Clk_0;
+  }
+  else
+  {
     clock++;
   }
-  ActlDutyCycle = (uint16)(DutyCycle*ActlPeriod/100);
 
   IfxGtm_Atom_Timer_disableUpdate(myatomtimer);
   IfxGtm_Atom_Ch_setClockSource(myatomtimer->atom, myatomtimer->timerChannel, clock);
