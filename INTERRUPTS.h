@@ -1,4 +1,5 @@
 /**********************************************************************************************************************
+ * \file TimerTom.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -24,10 +25,13 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-#ifndef INTERRUPTS_H_
-#define INTERRUPTS_H_
+#ifndef INFINEONARDUINOLIKE_INTERRUPTS_H_
+#define INFINEONARDUINOLIKE_INTERRUPTS_H_
 #include "IfxGpt12.h"
-#include "INTERRUPTS_cfg.h"
+#include "Ifx_Types.h"
+#include "IfxGpt12.h"
+#include "IfxGtm_Atom_Timer.h"
+#include "IfxGtm_Tom_Timer.h"
 
 
 /*********************************************************************************************************************/
@@ -59,4 +63,4 @@ void initGpt12interrupt(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,
 void interruptGpt12(void);
 /*Tom Pwm timer test function*/
 void initTomPwmTimer(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin);
-#endif /* INTERRUPTS_H_ */
+#endif /* INFINEONARDUINOLIKE_INTERRUPTS_H_ */

@@ -29,8 +29,8 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "PWM_GENERATOR.h"
-
+#include <InfineonArduinoLike/PWM_GENERATOR.h>
+#include "math.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -40,22 +40,75 @@
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
 
-uint16 g_fadeValue = 0;   /* Fade value, starting from 0                  */
-uint16 g_fadeValue2 = 0;
-sint8 g_fadeDir = 1;
-sint8 g_fadeDir2 = 1; /* Fade direction variable                      */
+
 
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
-
+IfxGtm_Tom_Pwm_Config tomPwmConfig;
+IfxGtm_Atom_Pwm_Config atomPwmConfig;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
+/* Initialization functions */
+static void initTomPwmConfig(uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin,Ifx_GTM *gtm)
+{
+    tomPwmConfig.gtm                      = gtm;
+    tomPwmConfig.tom                      = pin->tom;
+    tomPwmConfig.tomChannel               = pin->channel;
+    tomPwmConfig.clock                    = clock;
+    tomPwmConfig.period                   = period;
+    tomPwmConfig.dutyCycle                = dutyCycle;
+    tomPwmConfig.signalLevel              = Ifx_ActiveState_high;
+    tomPwmConfig.oneShotModeEnabled       = FALSE;
+    tomPwmConfig.synchronousUpdateEnabled = TRUE;
+    tomPwmConfig.immediateStartEnabled    = FALSE;
+    tomPwmConfig.interrupt.ccu0Enabled    = FALSE;
+    tomPwmConfig.interrupt.ccu1Enabled    = FALSE;
+    tomPwmConfig.interrupt.mode           = IfxGtm_IrqMode_pulseNotify;
+    tomPwmConfig.interrupt.isrProvider    = IfxSrc_Tos_cpu0;
+    tomPwmConfig.interrupt.isrPriority    = 0;
+    tomPwmConfig.pin.outputPin            = pin;
+    tomPwmConfig.pin.outputMode           = IfxPort_OutputMode_pushPull;
+    tomPwmConfig.pin.padDriver            = IfxPort_PadDriver_cmosAutomotiveSpeed1;
+}
 
+void initAtomPwmConfig(uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin,Ifx_GTM *gtm)
+{
+    atomPwmConfig.gtm                      = gtm;
+    atomPwmConfig.atom                     = pin->atom;
+    atomPwmConfig.atomChannel              = pin->channel;
+    atomPwmConfig.period                   = period;
+    atomPwmConfig.dutyCycle                = dutyCycle;
+    atomPwmConfig.signalLevel              = Ifx_ActiveState_high;
+    atomPwmConfig.mode                     = IfxGtm_Atom_Mode_outputPwm;
+    atomPwmConfig.oneShotModeEnabled       = FALSE;
+    atomPwmConfig.synchronousUpdateEnabled = TRUE;
+    atomPwmConfig.immediateStartEnabled    = FALSE;
+    atomPwmConfig.interrupt.ccu0Enabled    = FALSE;
+    atomPwmConfig.interrupt.ccu1Enabled    = FALSE;
+    atomPwmConfig.interrupt.mode           = IfxGtm_IrqMode_pulseNotify;
+    atomPwmConfig.interrupt.isrProvider    = IfxSrc_Tos_cpu0;
+    atomPwmConfig.interrupt.isrPriority    = 0;
+    atomPwmConfig.pin.outputPin            = pin;
+    atomPwmConfig.pin.outputMode           = IfxPort_OutputMode_pushPull;
+    atomPwmConfig.pin.padDriver            = IfxPort_PadDriver_cmosAutomotiveSpeed1;
+}
+
+void initTomPwmDriver(IfxGtm_Tom_Pwm_Driver *Tomdriver)
+{
+    IfxGtm_Tom_Pwm_init(Tomdriver, &tomPwmConfig);                 /* Initialize the PWM                       */
+    IfxGtm_Tom_Pwm_start(Tomdriver, TRUE);                         /* Start the PWM                            */
+}
+
+void initAtomPwmDriver(IfxGtm_Atom_Pwm_Driver *Atomdriver)
+{
+    IfxGtm_Atom_Pwm_init(Atomdriver, &atomPwmConfig);                 /* Initialize the PWM                       */
+    IfxGtm_Atom_Pwm_start(Atomdriver, TRUE);
+}
 
 
 
@@ -83,7 +136,6 @@ void initAtomPwm(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyC
     initAtomPwmDriver(myatomdriver);            /* Initialize the PWM                       */
 
 }
-
 
 
 /* This function sets the duty cycle of the PWM */

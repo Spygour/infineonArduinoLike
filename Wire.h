@@ -25,8 +25,8 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-#ifndef WIRE_H_
-#define WIRE_H_
+#ifndef INFINEONARDUINOLIKE_WIRE_H_
+#define INFINEONARDUINOLIKE_WIRE_H_
 
 #include "Ifx_Types.h"
 #include "IfxI2c_I2c.h"
@@ -54,8 +54,9 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void I2C_init(IfxI2c_I2c* myi2c,IfxI2c_I2c_Device* myi2cdev,uint8 I2cAddress,float32 Baudrate);
-void I2C_write(IfxI2c_I2c_Device* myi2cdev,uint8 *data,Ifx_SizeT size);
-void I2C_read(IfxI2c_I2c_Device* myi2cdev,uint8* registerAddress, Ifx_SizeT size,volatile uint8* myRxTxBuffer);
+void I2c_Init(IfxI2c_I2c* myi2c,IfxI2c_I2c_Device* myi2cdev,uint8 I2cAddress,float32 Baudrate);
+void I2c_Write(IfxI2c_I2c_Device* myi2cdev,uint8 *data,Ifx_SizeT size);
+void I2c_ReadBytes(IfxI2c_I2c_Device* myi2cdev,volatile uint8 *data,Ifx_SizeT size);
+void I2c_ReadRegister(IfxI2c_I2c_Device* myi2cdev,uint8 registerAddress, Ifx_SizeT size,volatile uint8* myRxTxBuffer);
 
-#endif /* WIRE_H_ */
+#endif /* INFINEONARDUINOLIKE_WIRE_H_ */

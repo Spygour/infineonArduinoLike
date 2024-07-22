@@ -29,9 +29,7 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "Wire.h"
-#include "Ifx_Types.h"
-#include "IfxI2c_I2c.h"
+#include <kitronicTempSensor/Wire.h>
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -50,13 +48,13 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void I2C_write(IfxI2c_I2c_Device* myi2cdev,uint8 *data,Ifx_SizeT size);
-void I2C_read(IfxI2c_I2c_Device* myi2cdev,uint8* registerAddress, Ifx_SizeT size,volatile uint8* myRxTxBuffer);
+void I2c_Write(IfxI2c_I2c_Device* myi2cdev,uint8 *data,Ifx_SizeT size);
+void I2c_ReadRegister(IfxI2c_I2c_Device* myi2cdev,uint8 registerAddress, Ifx_SizeT size,volatile uint8* myRxTxBuffer);
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 //i2c init function
-void I2C_init(IfxI2c_I2c* myi2c,IfxI2c_I2c_Device* myi2cdev,uint8 I2cAddress,float32 Baudrate)
+void I2c_Init(IfxI2c_I2c* myi2c,IfxI2c_I2c_Device* myi2cdev,uint8 I2cAddress,float32 Baudrate)
 {
     IfxI2c_I2c_Config config;
     IfxI2c_I2c_initConfig(&config, &MODULE_I2C0);
@@ -79,18 +77,22 @@ void I2C_init(IfxI2c_I2c* myi2c,IfxI2c_I2c_Device* myi2cdev,uint8 I2cAddress,flo
 }
 
 //i2c write simple function
-void I2C_write(IfxI2c_I2c_Device* myi2cdev,uint8 *data,Ifx_SizeT size)
+void I2c_Write(IfxI2c_I2c_Device* myi2cdev,uint8 *data,Ifx_SizeT size)
 {
     while(IfxI2c_I2c_write(myi2cdev,&data[0],size)==IfxI2c_I2c_Status_nak);
 }
 
+void I2c_ReadBytes(IfxI2c_I2c_Device* myi2cdev,volatile uint8 *data,Ifx_SizeT size)
+{
+  while (IfxI2c_I2c_read(myi2cdev, data, size) == IfxI2c_I2c_Status_nak);
+}
+
 //i2c read simple function
-void I2C_read(IfxI2c_I2c_Device* myi2cdev,uint8* registerAddress, Ifx_SizeT size,volatile uint8* myRxTxBuffer)
+void I2c_ReadRegister(IfxI2c_I2c_Device* myi2cdev,uint8 registerAddress, Ifx_SizeT size,volatile uint8* myRxTxBuffer)
 {
 
-    uint8 registerArray[1] = {*registerAddress};
     // Send the register address to the device
-    while (IfxI2c_I2c_write(myi2cdev, &registerArray[0], 0) == IfxI2c_I2c_Status_nak);
+    while (IfxI2c_I2c_write(myi2cdev, &registerAddress, 0) == IfxI2c_I2c_Status_nak);
 
     // Read the data from the device
     while (IfxI2c_I2c_read(myi2cdev, myRxTxBuffer, size) == IfxI2c_I2c_Status_nak);
