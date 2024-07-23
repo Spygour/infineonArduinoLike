@@ -35,9 +35,7 @@
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
 #define MAX_TOM_CHANNELS            3
-#define PHASE_U_HS                IfxGtm_TOM1_1_TOUT19_P00_10_OUT /* Pin driven by the PWM, P00.5                                                                                                                                                                                                                                                                                                                                                                      */
-#define PHASE_V_HS                &IfxGtm_TOM1_4_TOUT14_P00_5_OUT  /* Pin driven by the PWM, P00.6                  */
-#define PHASE_W_HS                &IfxGtm_TOM1_5_TOUT15_P00_6_OUT  /* Pin driven by the PWM, P00.7                   */
+
 
 
 /*********************************************************************************************************************/
@@ -49,10 +47,10 @@ typedef struct
     IfxGtm_Tom_Timer    timer;                  /* Timer driver                                                      */
     IfxGtm_Tom_PwmHl    pwm;                    /* GTM TOM PWM driver object                                         */
     Ifx_TimerValue      pwmOnTimes[2];          /* PWM ON-time for 3 phases                                          */
-    IfxGtm_Tom_Pwm3Ch update;
-} Pwm3TimersOutput;
+    IfxGtm_Tom_Pwm3_Ch  update;
+} Pwm3_Timers_Output;
 
-Pwm3TimersOutput g_pwm3PhaseOutput2;
+Pwm3_Timers_Output GpwmThreePhaseOutput;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -60,82 +58,85 @@ Pwm3TimersOutput g_pwm3PhaseOutput2;
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
-
-IFX_STATIC void IfxGtm_Tom_PwmThreeTimers_updateOff(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
+/*This function sets default pwm signals for every phase*/
+IFX_STATIC void IfxGtmTomPwmThreeTimersUpdateOff(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
     IFX_UNUSED_PARAMETER(tOn)
-    uint8 channelIndex;
+    uint8 ChannelIndex;
     Ifx_TimerValue period;
 
     period = driver->timer->base.period;
 
-    for (channelIndex = 0; channelIndex < driver->base.channelCount; channelIndex++)
+    for (ChannelIndex = 0; ChannelIndex < driver->base.channelCount; ChannelIndex++)
     {
-        IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex],
+        IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[ChannelIndex],
             2 /* 1 will keep the previous level */, 2 + 2);
     }
 }
 
 
-
-void IfxGtm_Tom_PwmThreeTimers_setOnTime(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
+/*This function runs the function pointer of the GpwmThreePhaseOutput.update structure and sets the dutycycle of the pwm signals*/
+void IfxGtm_TomPwmThreeTimersSetOnTime(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
-    g_pwm3PhaseOutput2.update.set_mode(driver, tOn);
+    GpwmThreePhaseOutput.update.setMode(driver, tOn);
 }
 
 
-
-IFX_STATIC void IfxGtm_Tom_PwmThreeTimers_updateCenterAligned(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
+/*This function Starts the three phase pwm signals*/
+IFX_STATIC void IfxGtmTomPwmThreeTimersUpdateCenterAligned(IfxGtm_Tom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
-    uint8          channelIndex;
-    Ifx_TimerValue period;
+    uint8          ChannelIndex;
+    Ifx_TimerValue Period;
 
-    period = driver->timer->base.period;
+    Period = driver->timer->base.period; /*Get period of the master timer*/
 
-    for (channelIndex = 0; channelIndex < driver->base.channelCount; channelIndex++)
+    for (ChannelIndex = 0; ChannelIndex < driver->base.channelCount; ChannelIndex++)
     {
-        Ifx_TimerValue x;             /* x=period*dutyCycle, x=OnTime+deadTime */
-        Ifx_TimerValue cm0, cm1;
-        x = tOn[channelIndex];
-        if (x+period/2>=period){
-            cm1 = x;
-            cm0 = x+(period/2)-period+1;
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], (uint16)cm0,(uint16)cm1);
+        Ifx_TimerValue X;             /* x=period*dutyCycle, x=OnTime+deadTime */
+        Ifx_TimerValue Cm0, Cm1;
+        X = tOn[ChannelIndex];
+        Cm1 = X;
+        Cm0 = Period/2 + X;
+        while (Cm1 >= Period)
+        {
+          Cm1 -= Period+1;
         }
-        else{
-                      /* x% duty cycle */
-            cm1 = x; // CM1
-            cm0 = x+(period/2); // CM0
-            IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[channelIndex], (uint16)cm0,(uint16)cm1);
+
+        while (Cm0  >= Period)
+        {
+          Cm0 -= Period+1;
         }
+        IfxGtm_Tom_Ch_setCompareShadow(driver->tom, driver->ccxTemp[ChannelIndex],(uint16)Cm0,(uint16)Cm1);
     }
 }
 
-
-IFX_STATIC IFX_CONST IfxGtm_Tom_Pwm3Ch IfxGtm_Tom_Pwm3ch_modes[2] = {
-    {Ifx_Pwm_Mode_centerAligned,         FALSE, &IfxGtm_Tom_PwmThreeTimers_updateCenterAligned  },
-    {Ifx_Pwm_Mode_off,                   FALSE, &IfxGtm_Tom_PwmThreeTimers_updateOff   }
+/*This pointer of structures has the different modes of the three phase signals, at first we use the configuration of
+ * IfxGtmTomPwm3chModes[1] structure and then the configuration of IfxGtmTomPwm3chModes[0] structure*/
+IFX_STATIC IFX_CONST IfxGtm_Tom_Pwm3_Ch IfxGtmTomPwm3chModes[2] = {
+    {Ifx_Pwm_Mode_centerAligned,         FALSE, &IfxGtmTomPwmThreeTimersUpdateCenterAligned  },
+    {Ifx_Pwm_Mode_off,                   FALSE, &IfxGtmTomPwmThreeTimersUpdateOff   }
     /*To add two more modes*/
 };
 
 
-boolean IfxGtm_Tom_PwmThreeTimers_setMode(IfxGtm_Tom_PwmHl *driver, Ifx_Pwm_Mode mode)
+/*This function sets the mode of the three phase pwm signals*/
+boolean IfxGtm_TomPwmThreeTimersSetMode(IfxGtm_Tom_PwmHl *driver, Ifx_Pwm_Mode mode)
 {
-    boolean                result = TRUE;
-    IfxGtm_Tom_PwmHl_Base *base   = &driver->base;
+    boolean                Result = TRUE;
+    IfxGtm_Tom_PwmHl_Base *Base   = &driver->base;
 
-    if (base->mode != mode)
+    if (Base->mode != mode)
     {
         if (mode > Ifx_Pwm_Mode_off)
         {
-            mode   = Ifx_Pwm_Mode_off;
-            result = FALSE;
+            mode = Ifx_Pwm_Mode_off;
+            Result = FALSE;
         }
 
         IFX_ASSERT(IFX_VERBOSE_LEVEL_ERROR, mode == IfxGtm_Tom_Pwmccx_modes[mode].mode);
 
-        base->mode             = mode;
-        g_pwm3PhaseOutput2.update         = IfxGtm_Tom_Pwm3ch_modes[0];
+        Base->mode             = mode;
+        GpwmThreePhaseOutput.update         = IfxGtmTomPwm3chModes[0];
 
             driver->ccxTemp   = driver->ccx;
 
@@ -146,181 +147,190 @@ boolean IfxGtm_Tom_PwmThreeTimers_setMode(IfxGtm_Tom_PwmHl *driver, Ifx_Pwm_Mode
 
             /* Ifx_Pwm_Mode_centerAligned and Ifx_Pwm_Mode_LeftAligned use inverted=FALSE */
             /* Ifx_Pwm_Mode_centerAlignedInverted and Ifx_Pwm_Mode_RightAligned use inverted=TRUE */
-            uint32 channelIndex;
+            uint32 ChannelIndex;
 
-            for (channelIndex = 0; channelIndex < driver->base.channelCount; channelIndex++)
+            for (ChannelIndex = 0; ChannelIndex < driver->base.channelCount; ChannelIndex++)
             {
-                IfxGtm_Tom_Ch channel;
+                IfxGtm_Tom_Ch Channel;
 
-                channel = driver->ccx[channelIndex];
-                IfxGtm_Tom_Ch_setSignalLevel(driver->tom, channel, base->ccxActiveState);
+                Channel = driver->ccx[ChannelIndex];
+                IfxGtm_Tom_Ch_setSignalLevel(driver->tom, Channel, Base->ccxActiveState); /*Every phase must have the same signal level, active state high*/
 
             }
         }
     }
 
-    return result;
+    return Result;
 }
 
 
 
-
-
-boolean IfxGtm_Tom_PwmThreeTimers_init(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config *config) {
-    boolean           result = TRUE;
-    uint16            channelMask;
-    uint16            channelsMask = 0;
-    uint32            channelIndex;
-    uint16            maskShift    = 0;
-    IfxGtm_Tom_Timer *timer        = config->timer;
+/*This function returns true when the three timers are initialized correctly*/
+boolean IfxGtm_TomPwmThreeTimersInit(IfxGtm_Tom_PwmHl *driver, IfxGtm_Tom_PwmHl_Config *config) {
+    boolean           Result = TRUE;
+    uint16            ChannelMask;
+    uint16            ChannelsMask = 0;
+    uint32            ChannelIndex;
+    uint16            MaskShift    = 0;
+    IfxGtm_Tom_Timer  *Timer        = config->timer;
 
     driver->base.mode             = Ifx_Pwm_Mode_init;
-    driver->timer                 = timer;
+    driver->timer                 = Timer;
     driver->base.setMode          = 0;
     driver->base.inverted         = FALSE;
-    driver->base.ccxActiveState   = config->base.ccxActiveState;
-    driver->base.channelCount     = config->base.channelCount;
+    driver->base.ccxActiveState   = config->base.ccxActiveState; /*Gets the active state of pwm signals from the configuration struct*/
+    driver->base.channelCount     = config->base.channelCount; /*Gets the max channel count of controlled pwm signals by the master timer*/
 
 
-    driver->tom = &(timer->gtm->TOM[config->tom]);
+    driver->tom = &(Timer->gtm->TOM[config->tom]); /*Gets the Tom used as master*/
 
     /* config->ccx[0] is used for the definition of the TGC */
     if (config->ccx[0]->channel <= 7)
     {
-        driver->tgc = IfxGtm_Tom_Ch_getTgcPointer(driver->tom, 0);
+        driver->tgc = IfxGtm_Tom_Ch_getTgcPointer(driver->tom, 0); /*In case we have channels from 0-6 we enable global control register 0*/
     }
     else
     {
-        driver->tgc = IfxGtm_Tom_Ch_getTgcPointer(driver->tom, 1);
+        driver->tgc = IfxGtm_Tom_Ch_getTgcPointer(driver->tom, 1); /*In case we have channels from 7-15 we enable global control register 1*/
     }
 
-    maskShift = (config->ccx[0]->channel <= 7) ? 0 : 8;
+    MaskShift = (config->ccx[0]->channel <= 7) ? 0 : 8;
 
-    IFX_ASSERT(IFX_VERBOSE_LEVEL_ERROR, config->base.channelCount <= IFXGTM_TOM_PWMHL_MAX_NUM_CHANNELS);
+    IFX_ASSERT(IFX_VERBOSE_LEVEL_ERROR, config->base.channelCount <= IFXGTM_TOM_PWMHL_MAX_NUM_CHANNELS); /*In case we have less than 2 controlled pwm signals return 0*/
 
-    IfxGtm_Tom_Ch_ClkSrc clock = IfxGtm_Tom_Ch_getClockSource(timer->tom, timer->timerChannel);
+    IfxGtm_Tom_Ch_ClkSrc Clock = IfxGtm_Tom_Ch_getClockSource(Timer->tom, Timer->timerChannel); /*Set prescaler for every phase*/
 
-    for (channelIndex = 0; channelIndex < config->base.channelCount; channelIndex++)
+    for (ChannelIndex = 0; ChannelIndex < config->base.channelCount; ChannelIndex++)
     {
-        IfxGtm_Tom_Ch channel;
+        IfxGtm_Tom_Ch Channel;
         /* CCX */
-        channel                   = config->ccx[channelIndex]->channel;
-        driver->ccx[channelIndex] = channel;
-        channelMask               = 1 << (channel - maskShift);
-        channelsMask             |= channelMask;
+        Channel                   = config->ccx[ChannelIndex]->channel;
+        driver->ccx[ChannelIndex] = Channel;
+        ChannelMask               = 1 << (Channel - MaskShift);
+        ChannelsMask             |= ChannelMask;
 
         /* Initialize the timer part */
-        IfxGtm_Tom_Ch_setClockSource(driver->tom, channel, clock);
+        IfxGtm_Tom_Ch_setClockSource(driver->tom, Channel, Clock);
 
         /* Initialize the SOUR reset value and enable the channel */
-        IfxGtm_Tom_Ch_setSignalLevel(driver->tom, channel,config->base.ccxActiveState);
-        IfxGtm_Tom_Tgc_enableChannels(driver->tgc, channelMask, 0, TRUE); /* Write the SOUR outout with !SL */
-        IfxGtm_Tom_Tgc_enableChannelsOutput(driver->tgc, channelMask, 0, TRUE);
+        IfxGtm_Tom_Ch_setSignalLevel(driver->tom, Channel,config->base.ccxActiveState);
+        IfxGtm_Tom_Tgc_enableChannels(driver->tgc, ChannelMask, 0, TRUE); /* Write the SOUR outout with !SL */
+        IfxGtm_Tom_Tgc_enableChannelsOutput(driver->tgc, ChannelMask, 0, TRUE);
 
         /* Set the SL to the required level for run time */
-        IfxGtm_Tom_Ch_setSignalLevel(driver->tom, channel, config->base.ccxActiveState);
-        IfxGtm_Tom_Ch_setResetSource(driver->tom, channel, IfxGtm_Tom_Ch_ResetEvent_onTrigger);
-        IfxGtm_Tom_Ch_setTriggerOutput(driver->tom, channel, IfxGtm_Tom_Ch_OutputTrigger_forward);
-        IfxGtm_Tom_Ch_setCounterValue(driver->tom, channel, IfxGtm_Tom_Timer_getOffset(driver->timer));
+        IfxGtm_Tom_Ch_setSignalLevel(driver->tom, Channel, config->base.ccxActiveState);
+        IfxGtm_Tom_Ch_setResetSource(driver->tom, Channel, IfxGtm_Tom_Ch_ResetEvent_onTrigger);
+        IfxGtm_Tom_Ch_setTriggerOutput(driver->tom, Channel, IfxGtm_Tom_Ch_OutputTrigger_forward);
+        IfxGtm_Tom_Ch_setCounterValue(driver->tom, Channel, IfxGtm_Tom_Timer_getOffset(driver->timer));
 
-        /*Initialize the port */
+        /*Initialize the port in case it does not exists on pinmap*/
         if (config->initPins == TRUE)
         {
-            IfxGtm_PinMap_setTomTout(config->ccx[channelIndex],
+            IfxGtm_PinMap_setTomTout(config->ccx[ChannelIndex],
                 config->base.outputMode, config->base.outputDriver);
-            IfxPort_setPinState(config->ccx[channelIndex]->pin.port, config->ccx[channelIndex]->pin.pinIndex, config->base.ccxActiveState ? IfxPort_State_low : IfxPort_State_high);
+            IfxPort_setPinState(config->ccx[ChannelIndex]->pin.port, config->ccx[ChannelIndex]->pin.pinIndex, config->base.ccxActiveState ? IfxPort_State_low : IfxPort_State_high);
         }
     }
-    IfxGtm_Tom_PwmThreeTimers_setMode(driver, Ifx_Pwm_Mode_off);
+    IfxGtm_TomPwmThreeTimersSetMode(driver, Ifx_Pwm_Mode_off); /*Enable the timers by having zero dutycycle*/
 
     Ifx_TimerValue tOn[MAX_TOM_CHANNELS] = {0};
-    IfxGtm_Tom_PwmThreeTimers_updateOff(driver, tOn);     /* tOn do not need defined values */
+    IfxGtmTomPwmThreeTimersUpdateOff(driver, tOn);     /* tOn do not need defined values */
     /* Transfer the shadow registers */
-    IfxGtm_Tom_Tgc_setChannelsForceUpdate(driver->tgc, channelsMask, 0, 0, 0);
+    IfxGtm_Tom_Tgc_setChannelsForceUpdate(driver->tgc, ChannelsMask, 0, 0, 0);
     IfxGtm_Tom_Tgc_trigger(driver->tgc);
-    IfxGtm_Tom_Tgc_setChannelsForceUpdate(driver->tgc, 0, channelsMask, 0, 0);
+    IfxGtm_Tom_Tgc_setChannelsForceUpdate(driver->tgc, 0, ChannelsMask, 0, 0);
 
     /* Enable timer to update the channels */
-    for (channelIndex = 0; channelIndex < driver->base.channelCount; channelIndex++)
+    for (ChannelIndex = 0; ChannelIndex < driver->base.channelCount; ChannelIndex++)
     {
-        IfxGtm_Tom_Timer_addToChannelMask(timer, driver->ccx[channelIndex]);
+        IfxGtm_Tom_Timer_addToChannelMask(Timer, driver->ccx[ChannelIndex]);
     }
 
-    return result;
+    return Result;
 }
 
-void InitThreeTimersPwm(float PWM_FREQ,float32 phase_shift,IfxGtm_Tom_Ch_ClkSrc clock,IfxGtm_Tom_ToutMap* masterPin)
+/*Main function of the Three timers Phase shift PWM*/
+void Init_ThreeTimersPwm(uint32 Period,uint32 phaseShift,IfxGtm_Tom_ToutMap* masterPin, IfxGtm_Tom_ToutMapP* slavePins)
 {
-        IfxGtm_enable(&MODULE_GTM);
-        /* Set the GTM global clock frequency in Hz */
-        IfxGtm_Cmu_setGclkFrequency(&MODULE_GTM, IfxGtm_Cmu_getModuleFrequency(&MODULE_GTM));
-        /* Set the GTM configurable clock frequency in Hz */
-        IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_0, IfxGtm_Cmu_getGclkFrequency(&MODULE_GTM));
-        /* Enable the FXU clock                         */
-        IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);
-        IfxGtm_Tom_Timer_Config timerConfig;                                        /* Timer configuration              */
-        IfxGtm_Tom_Timer_initConfig(&timerConfig, &MODULE_GTM);                     /* Initialize timer configuration   */
-        /*init pwm*/
-        timerConfig.triggerOut           = masterPin;
-        timerConfig.initPins             = TRUE;
-        timerConfig.base.trigger.enabled = TRUE;
-        timerConfig.base.trigger.risingEdgeAtPeriod = Ifx_ActiveState_high;
-        //timerConfig.base.trigger.triggerPoint = dutyCycle;
-        timerConfig.base.countDir        = IfxStdIf_Timer_CountDir_up;
-        timerConfig.base.trigger.outputDriver = IfxPort_PadDriver_cmosAutomotiveSpeed1;
-        timerConfig.base.trigger.outputMode = IfxPort_OutputMode_pushPull;
-        timerConfig.base.trigger.outputEnabled = TRUE;
-        timerConfig.irqModeTrigger       = IfxGtm_IrqMode_pulseNotify;
+  uint16 Prescaler[5] = {1, 16, 256, 4096, 32768};
+  uint32 PeriodActl = Period*100;
+  IfxGtm_Tom_Ch_ClkSrc ClckSrc= 0;
+  float32 freq;
+  while(PeriodActl > 0xFFFF)
+  {
+    PeriodActl = PeriodActl/Prescaler[ClckSrc];
+    ClckSrc += 1;
+  }
+  freq = 1000000/(float32)Period;
+  IfxGtm_enable(&MODULE_GTM);
+  /* Set the GTM global clock frequency in Hz */
+  IfxGtm_Cmu_setGclkFrequency(&MODULE_GTM, IfxGtm_Cmu_getModuleFrequency(&MODULE_GTM));
+  /* Set the GTM configurable clock frequency in Hz */
+  IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_0, IfxGtm_Cmu_getGclkFrequency(&MODULE_GTM));
+  /* Enable the FXU clock                         */
+  IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);
+  IfxGtm_Tom_Timer_Config TimerConfig;                                        /* Timer configuration              */
+  IfxGtm_Tom_Timer_initConfig(&TimerConfig, &MODULE_GTM);                     /* Initialize timer configuration   */
+  /*init pwm using the IfxGtm_Tom_Timer_Config of the Tom timer library*/
+  TimerConfig.triggerOut           = masterPin;                               /* Set the output pin used by the master timer*/
+  TimerConfig.initPins             = TRUE;                                    /* Enable the initialization of the ouput pin*/
+  TimerConfig.base.trigger.enabled = TRUE;                                    /* Enable the trigger of the output pin*/
+  TimerConfig.base.trigger.risingEdgeAtPeriod = Ifx_ActiveState_high;         /* Active state high*/
+  TimerConfig.base.countDir        = IfxStdIf_Timer_CountDir_up;              /* Count mode up*/
+  TimerConfig.base.trigger.outputDriver = IfxPort_PadDriver_cmosAutomotiveSpeed1; /*pad driver speed grade 1*/
+  TimerConfig.base.trigger.outputMode = IfxPort_OutputMode_pushPull;          /* output mode push pull*/
+  TimerConfig.base.trigger.outputEnabled = TRUE;                              /* Enable output from trigger pin*/
+  TimerConfig.irqModeTrigger       = IfxGtm_IrqMode_pulseNotify;              /* Enable the pulse of the Output signal as interrupt*/
 
-        timerConfig.base.frequency       = PWM_FREQ;                                /* Set timer frequency              */
-        timerConfig.base.isrPriority     = 0;
-        timerConfig.base.isrProvider     = IfxSrc_Tos_cpu0;
-        timerConfig.tom                  = masterPin->tom;                        /* Define the timer used            */
-        timerConfig.timerChannel         = masterPin->channel;                         /* Define the channel used          */
-        timerConfig.clock                = clock;
-        /* Define the CMU clock used        */
+  TimerConfig.base.frequency       = freq;                                /* Set timer frequency              */
+  TimerConfig.base.isrPriority     = 0;                                       /* Disable interrupts */
+  TimerConfig.base.isrProvider     = IfxSrc_Tos_cpu0;                         /* Isr on cpu 0*/
+  TimerConfig.tom                  = masterPin->tom;                          /* Define the timer used            */
+  TimerConfig.timerChannel         = masterPin->channel;                      /* Define the channel used          */
+  TimerConfig.clock                = ClckSrc;
+  /* Define the CMU clock used        */
 
-        IfxGtm_Tom_Timer_init(&g_pwm3PhaseOutput2.timer, &timerConfig);                        /* Initialize the TOM               */
-        Ifx_TimerValue triggerPoint = IfxGtm_Tom_Timer_getPeriod(&g_pwm3PhaseOutput2.timer);
-        IfxGtm_Tom_Tgc_enableChannelUpdate(g_pwm3PhaseOutput2.timer.tgc[0],g_pwm3PhaseOutput2.timer.triggerChannel,TRUE);
+  IfxGtm_Tom_Timer_init(&GpwmThreePhaseOutput.timer, &TimerConfig);                        /* Initialize the TOM               */
+  IfxGtm_Tom_Tgc_enableChannelUpdate(GpwmThreePhaseOutput.timer.tgc[0],GpwmThreePhaseOutput.timer.triggerChannel,TRUE);
 
-         IfxGtm_Tom_PwmHl_Config pwmHlConfig;
+  IfxGtm_Tom_PwmHl_Config PwmHlConfig;
 
-         IfxGtm_Tom_ToutMapP ccx[] =
-                 {
-                     PHASE_V_HS, /* PWM High-side 1 */
-                     PHASE_W_HS, /* PWM High-side 2 */
-                     NULL_PTR  /* PWM High-side 3 */
-                 };
-         IfxGtm_Tom_PwmHl_initConfig(&pwmHlConfig);
-         pwmHlConfig.base.channelCount = 2;
+  IfxGtm_Tom_ToutMapP Ccx[] =
+          {
+              slavePins[0], /* PWM High-side 1 */
+              slavePins[1], /* PWM High-side 2 */
+              NULL_PTR  /* PWM High-side 3 is null since the third pwm phase is provide by the master timer*/
+          };
+  IfxGtm_Tom_PwmHl_initConfig(&PwmHlConfig);
+  PwmHlConfig.base.channelCount = 2; /* Controlled channels are two */
 
-         pwmHlConfig.base.outputMode = IfxPort_OutputMode_pushPull;
-
-
-         pwmHlConfig.base.outputDriver = IfxPort_PadDriver_cmosAutomotiveSpeed1;
-
-         /* Set top PWM active state */
-         pwmHlConfig.base.ccxActiveState = Ifx_ActiveState_low;
+  PwmHlConfig.base.outputMode = IfxPort_OutputMode_pushPull; /* Output mode is push pull */
 
 
-         pwmHlConfig.ccx   = ccx;                        /* Assign the channels for High-side switches   */
+  PwmHlConfig.base.outputDriver = IfxPort_PadDriver_cmosAutomotiveSpeed1; /* Pad driver speed grade 1 */
 
-         pwmHlConfig.timer = &g_pwm3PhaseOutput2.timer;
-         pwmHlConfig.tom   = timerConfig.tom;
+  /* Set top PWM active state */
+  PwmHlConfig.base.ccxActiveState = Ifx_ActiveState_low;
 
-         IfxGtm_Tom_PwmThreeTimers_init(&g_pwm3PhaseOutput2.pwm, &pwmHlConfig);
 
-         IfxGtm_Tom_PwmThreeTimers_setMode(&g_pwm3PhaseOutput2.pwm, Ifx_Pwm_Mode_centerAligned);
-         /* Update the input frequency */
-         IfxGtm_Tom_Timer_updateInputFrequency(&g_pwm3PhaseOutput2.timer);
-         IfxGtm_Tom_Timer_run(&g_pwm3PhaseOutput2.timer);
-         /* Calculate initial values of PWM duty cycles */
-         g_pwm3PhaseOutput2.pwmOnTimes[0] = g_pwm3PhaseOutput2.pwm.timer->base.period * phase_shift;
-         g_pwm3PhaseOutput2.pwmOnTimes[1] = g_pwm3PhaseOutput2.pwm.timer->base.period * 2 * phase_shift;
-         /* Update PWM duty cycles */
-         IfxGtm_Tom_Timer_disableUpdate(&g_pwm3PhaseOutput2.timer);
-         IfxGtm_Tom_Timer_setTrigger(&g_pwm3PhaseOutput2.timer, triggerPoint/2);
-         IfxGtm_Tom_PwmThreeTimers_setOnTime(&g_pwm3PhaseOutput2.pwm, g_pwm3PhaseOutput2.pwmOnTimes);
-         IfxGtm_Tom_Timer_applyUpdate(&g_pwm3PhaseOutput2.timer);
+  PwmHlConfig.ccx   = Ccx;                        /* Assign the channels for High-side switches   */
+
+  PwmHlConfig.timer = &GpwmThreePhaseOutput.timer;  /* Use as master timer the timer we initialized */
+  PwmHlConfig.tom   = TimerConfig.tom;
+
+  IfxGtm_TomPwmThreeTimersInit(&GpwmThreePhaseOutput.pwm, &PwmHlConfig); /* Run the initialize of the three timers function */
+
+  IfxGtm_TomPwmThreeTimersSetMode(&GpwmThreePhaseOutput.pwm, Ifx_Pwm_Mode_centerAligned); /* Start the actual PWM signals */
+  /* Update the input frequency */
+  IfxGtm_Tom_Timer_updateInputFrequency(&GpwmThreePhaseOutput.timer);
+  IfxGtm_Tom_Timer_run(&GpwmThreePhaseOutput.timer); /* Start the count of master timer */
+  /* Calculate initial values of PWM duty cycles */
+  GpwmThreePhaseOutput.pwmOnTimes[0] = PeriodActl * phaseShift/100; /* First controlled signal is shifted to a percentage of master timer's period */
+  GpwmThreePhaseOutput.pwmOnTimes[1] = PeriodActl * 2 * phaseShift/100; /* Second controlled signal is shifted to two times the percentage of master timer's period */
+  /* Update PWM duty cycles */
+  IfxGtm_Tom_Timer_disableUpdate(&GpwmThreePhaseOutput.timer); /* Disable the update of master timer */
+  IfxGtm_Tom_Ch_setCompareShadow(GpwmThreePhaseOutput.timer.tom, GpwmThreePhaseOutput.timer.timerChannel,(uint16)PeriodActl,(uint16)PeriodActl/2);/* Set dutycycle 50 per cent */
+  IfxGtm_TomPwmThreeTimersSetOnTime(&GpwmThreePhaseOutput.pwm, GpwmThreePhaseOutput.pwmOnTimes); /* Set the shadow registers of the controlled pwm signals */
+  IfxGtm_Tom_Timer_applyUpdate(&GpwmThreePhaseOutput.timer);  /* Start every PWM signal at the same time */
 }
+
