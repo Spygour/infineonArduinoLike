@@ -60,5 +60,5 @@ typedef struct
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void InitThreeTimersPwm(float PWM_FREQ,float32 phase_shift,IfxGtm_Tom_Ch_ClkSrc clock,IfxGtm_Tom_ToutMap* masterPin);
+void Init_ThreeTimersPwm(uint32 Period,uint32 phaseShift,IfxGtm_Tom_ToutMap* masterPin, IfxGtm_Tom_ToutMapP* slavePins);
 #endif /* THREETIMERPHASE_H_ */
