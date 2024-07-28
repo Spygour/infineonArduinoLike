@@ -30,7 +30,7 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 
-#include <InfineonArduinoLike/INTERRUPTS.h>
+#include "INTERRUPTS.h"
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -107,18 +107,18 @@ static inline void setAtomConfig(float32 frequency, uint16 priority,uint16 atom,
     atomConfig.initPins       = TRUE;
 }
 
-static inline void setTomPwm(float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin,Ifx_GTM *GTM)
+static inline void setTomPwm(IfxGtm_Tom_ToutMap* pin,Ifx_GTM *GTM)
 {
-    tomPwmTimerConfig.base.frequency       = freq;
+    tomPwmTimerConfig.base.frequency       = 100;
     tomPwmTimerConfig.base.isrPriority     = 0;                        /* Set interrupt priority           */
     tomPwmTimerConfig.base.isrProvider     = IfxSrc_Tos_cpu0;                         /* Set interrupt provider           */
     tomPwmTimerConfig.base.minResolution              = 0;
     tomPwmTimerConfig.base.trigger.outputMode         = IfxPort_OutputMode_pushPull;
     tomPwmTimerConfig.base.trigger.outputDriver       = IfxPort_PadDriver_cmosAutomotiveSpeed1;
-    tomPwmTimerConfig.base.trigger.risingEdgeAtPeriod = Ifx_ActiveState_low;
+    tomPwmTimerConfig.base.trigger.risingEdgeAtPeriod = Ifx_ActiveState_high;
     tomPwmTimerConfig.base.trigger.outputEnabled      = TRUE;
     tomPwmTimerConfig.base.trigger.enabled            = TRUE;
-    tomPwmTimerConfig.base.trigger.triggerPoint       = 0;
+    tomPwmTimerConfig.base.trigger.triggerPoint       = 10;
     tomPwmTimerConfig.base.trigger.isrPriority        = 0;
     tomPwmTimerConfig.base.trigger.isrProvider        = IfxSrc_Tos_cpu0;
     tomPwmTimerConfig.base.startOffset                = 0.0;
@@ -126,7 +126,7 @@ static inline void setTomPwm(float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin,Ifx
     tomPwmTimerConfig.tom            = pin->tom;                            /* Define the timer used            */
     tomPwmTimerConfig.timerChannel   = pin->channel;                         /* Define the channel used          */
     tomPwmTimerConfig.triggerOut     = pin;
-    tomPwmTimerConfig.clock          = clock;
+    tomPwmTimerConfig.clock          = 2;
     tomPwmTimerConfig.base.countDir  = IfxStdIf_Timer_CountDir_up;
     tomPwmTimerConfig.irqModeTimer   = IfxGtm_IrqMode_level;
     tomPwmTimerConfig.irqModeTrigger = IfxGtm_IrqMode_pulseNotify;
@@ -175,7 +175,7 @@ void initTomInterrupt(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,ui
 }
 
 
-void initTomPwmTimer(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin)
+void TomPwmTimer_Init(IfxGtm_Tom_Timer *mytomtimer,uint32 Period,uint16 DutyCycle,IfxGtm_Tom_ToutMap* pin)
 {
 
     IfxGtm_enable(&MODULE_GTM);
@@ -185,10 +185,11 @@ void initTomPwmTimer(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 clock,IfxGtm
     IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_0, IfxGtm_Cmu_getGclkFrequency(&MODULE_GTM));
     /* Enable the FXU clock                         */
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);
-    setTomPwm(freq,clock,pin,&MODULE_GTM); /*Set pwm the values to tom config*/
+    setTomPwm(pin,&MODULE_GTM); /*Set pwm the values to tom config*/
 
     setTomPwmDriver(mytomtimer);                  /* Initialize the TOM               */
     IfxGtm_Tom_Timer_run(mytomtimer); /* Start the TOM */
+    TomTimer_SetDutyAndPeriod(mytomtimer, DutyCycle, Period);
 
 }
 
@@ -235,11 +236,11 @@ void initGpt12interrupt(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,
 
 void TomTimer_SetDutyCycle(IfxGtm_Tom_Timer *mytomtimer, uint16 DutyCycle)
 {
-  uint16 ActlPeriod = (uint16)IfxGtm_Tom_Timer_getPeriod(mytomtimer);
-  uint16 ActlDutyCycle = DutyCycle*ActlPeriod/100;
+  uint32 ActlPeriod = IfxGtm_Tom_Ch_getCompareZero(mytomtimer->tom, mytomtimer->timerChannel);
+  uint32 ActlDutyCycle = (ActlPeriod*DutyCycle)/100;
 
   IfxGtm_Tom_Timer_disableUpdate(mytomtimer);
-  IfxGtm_Tom_Ch_setCompareOneShadow(mytomtimer->tom, mytomtimer->timerChannel, ActlDutyCycle);
+  IfxGtm_Tom_Ch_setCompareOneShadow(mytomtimer->tom, mytomtimer->timerChannel, (uint16)ActlDutyCycle);
   IfxGtm_Tom_Timer_applyUpdate(mytomtimer);
 }
 
@@ -247,24 +248,44 @@ void TomTimer_SetDutyCycle(IfxGtm_Tom_Timer *mytomtimer, uint16 DutyCycle)
 void TomTimer_SetPeriod(IfxGtm_Tom_Timer *mytomtimer,uint32 Period)
 {
   IfxGtm_Tom_Ch_ClkSrc clock = 0;
-  uint16 DutyCycle = (uint16)(IfxGtm_Tom_Ch_getCompareOne(mytomtimer->tom, mytomtimer->timerChannel)*100/IfxGtm_Tom_Timer_getPeriod(mytomtimer));
-  uint16 Prescaler[5] = {1, 16, 256, 4096, 32768};
+  uint32 DutyCycle = (IfxGtm_Tom_Ch_getCompareOne(mytomtimer->tom, mytomtimer->timerChannel)*100)/IfxGtm_Tom_Ch_getCompareZero(mytomtimer->tom, mytomtimer->timerChannel);
+  uint32 Prescaler[5] = {1, 16, 256, 4096, 32768};
   uint32 ActlPeriod = Period*100;
-  uint16 ActlDutyCycle;
+  uint32 ActlDutyCycle;
 
   while(ActlPeriod > 0xFFFF)
   {
     ActlPeriod = ActlPeriod/Prescaler[clock];
     clock++;
   }
-  ActlDutyCycle = (uint16)(DutyCycle*ActlPeriod/100);
+  ActlDutyCycle = (DutyCycle*ActlPeriod)/100;
 
   IfxGtm_Tom_Timer_disableUpdate(mytomtimer);
+  IfxGtm_Tom_Ch_setCompareShadow(mytomtimer->tom, mytomtimer->timerChannel, (uint16)ActlPeriod, (uint16)ActlDutyCycle);
   IfxGtm_Tom_Ch_setClockSource(mytomtimer->tom, mytomtimer->timerChannel, clock);
-  IfxGtm_Tom_Ch_setCompareShadow(mytomtimer->tom, mytomtimer->timerChannel, (uint16)ActlPeriod, ActlDutyCycle);
   IfxGtm_Tom_Timer_applyUpdate(mytomtimer);
 }
 
+
+void TomTimer_SetDutyAndPeriod(IfxGtm_Tom_Timer *mytomtimer,uint16 DutyCycle,uint32 Period)
+{
+    IfxGtm_Tom_Ch_ClkSrc clock = 0;
+    uint32 Prescaler[5] = {1, 16, 256, 4096, 32768};
+    uint32 ActlPeriod = Period*100;
+    uint32 ActlDutyCycle;
+
+    while(ActlPeriod > 0xFFFF)
+    {
+      ActlPeriod = ActlPeriod/Prescaler[clock];
+      clock++;
+    }
+    ActlDutyCycle = (DutyCycle*ActlPeriod)/100;
+
+    IfxGtm_Tom_Timer_disableUpdate(mytomtimer);
+    IfxGtm_Tom_Ch_setCompareShadow(mytomtimer->tom, mytomtimer->timerChannel, (uint16)ActlPeriod, (uint16)ActlDutyCycle);
+    IfxGtm_Tom_Ch_setClockSource(mytomtimer->tom, mytomtimer->timerChannel, clock);
+    IfxGtm_Tom_Timer_applyUpdate(mytomtimer);
+}
 
 
 void AtomTimer_SetDutyCycle(IfxGtm_Atom_Timer *myatomtimer, uint16 DutyCycle)
