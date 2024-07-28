@@ -62,9 +62,10 @@ void initAtomInterrupt(IfxGtm_Atom_Timer* mytimer,float32 frequency, uint16 prio
 void initGpt12interrupt(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,IfxGpt12_TimerInputPrescaler timerPrescaler,uint16 priority);
 void interruptGpt12(void);
 /*Tom Pwm timer test function*/
-void initTomPwmTimer(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 clock,IfxGtm_Tom_ToutMap* pin);
+void TomPwmTimer_Init(IfxGtm_Tom_Timer *mytomtimer,uint32 Period,uint16 DutyCycle,IfxGtm_Tom_ToutMap* pin);
 void TomTimer_SetDutyCycle(IfxGtm_Tom_Timer *mytomtimer, uint16 DutyCycle);
 void TomTimer_SetPeriod(IfxGtm_Tom_Timer *mytomtimer,uint32 Period);
+void TomTimer_SetDutyAndPeriod(IfxGtm_Tom_Timer *mytomtimer,uint16 DutyCycle,uint32 Period);
 void AtomTimer_SetDutyCycle(IfxGtm_Atom_Timer *myatomtimer, uint16 DutyCycle);
 void AtomTimer_SetPeriod(IfxGtm_Atom_Timer *myatomtimer,uint32 Period);
 
