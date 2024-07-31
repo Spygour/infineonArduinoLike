@@ -269,24 +269,38 @@ void TomTimer_SetPeriod(IfxGtm_Tom_Timer *mytomtimer,uint32 Period)
 
 void TomTimer_SetDutyAndPeriod(IfxGtm_Tom_Timer *mytomtimer,uint16 DutyCycle,uint32 Period)
 {
-    IfxGtm_Tom_Ch_ClkSrc clock = 0;
-    uint32 Prescaler[5] = {1, 16, 256, 4096, 32768};
-    uint32 ActlPeriod = Period*100;
-    uint32 ActlDutyCycle;
+  IfxGtm_Tom_Ch_ClkSrc clock = 0;
+  uint32 Prescaler[5] = {1, 16, 256, 4096, 32768};
+  uint32 ActlPeriod = Period*100;
+  uint32 ActlDutyCycle;
 
-    while(ActlPeriod > 0xFFFF)
-    {
-      ActlPeriod = ActlPeriod/Prescaler[clock];
-      clock++;
-    }
-    ActlDutyCycle = (DutyCycle*ActlPeriod)/100;
+  while(ActlPeriod > 0xFFFF)
+  {
+    ActlPeriod = ActlPeriod/Prescaler[clock];
+    clock++;
+  }
+  ActlDutyCycle = (DutyCycle*ActlPeriod)/100;
 
-    IfxGtm_Tom_Timer_disableUpdate(mytomtimer);
-    IfxGtm_Tom_Ch_setCompareShadow(mytomtimer->tom, mytomtimer->timerChannel, (uint16)ActlPeriod, (uint16)ActlDutyCycle);
-    IfxGtm_Tom_Ch_setClockSource(mytomtimer->tom, mytomtimer->timerChannel, clock);
-    IfxGtm_Tom_Timer_applyUpdate(mytomtimer);
+  IfxGtm_Tom_Timer_disableUpdate(mytomtimer);
+  IfxGtm_Tom_Ch_setCompareShadow(mytomtimer->tom, mytomtimer->timerChannel, (uint16)ActlPeriod, (uint16)ActlDutyCycle);
+  IfxGtm_Tom_Ch_setClockSource(mytomtimer->tom, mytomtimer->timerChannel, clock);
+  IfxGtm_Tom_Timer_applyUpdate(mytomtimer);
 }
 
+void TomTimer_SetPeriodActl(IfxGtm_Tom_Timer *mytomtimer, uint16 Period, IfxGtm_Tom_Ch_ClkSrc Prescaler)
+{
+  IfxGtm_Tom_Timer_disableUpdate(mytomtimer);
+  IfxGtm_Tom_Ch_setCompareZeroShadow(mytomtimer->tom, mytomtimer->timerChannel, Period);
+  IfxGtm_Tom_Ch_setClockSource(mytomtimer->tom, mytomtimer->timerChannel, Prescaler);
+  IfxGtm_Tom_Timer_applyUpdate(mytomtimer);
+}
+
+void TomTimer_SetDutyCycleActl(IfxGtm_Tom_Timer *mytomtimer,uint16 DutyCycle)
+{
+  IfxGtm_Tom_Timer_disableUpdate(mytomtimer);
+  IfxGtm_Tom_Ch_setCompareOneShadow(mytomtimer->tom, mytomtimer->timerChannel, (uint16)DutyCycle);
+  IfxGtm_Tom_Timer_applyUpdate(mytomtimer);
+}
 
 void AtomTimer_SetDutyCycle(IfxGtm_Atom_Timer *myatomtimer, uint16 DutyCycle)
 {
@@ -297,7 +311,6 @@ void AtomTimer_SetDutyCycle(IfxGtm_Atom_Timer *myatomtimer, uint16 DutyCycle)
   IfxGtm_Atom_Ch_setCompareOneShadow(myatomtimer->atom, myatomtimer->timerChannel, ActlDutyCycle);
   IfxGtm_Atom_Timer_applyUpdate(myatomtimer);
 }
-
 
 void AtomTimer_SetPeriod(IfxGtm_Atom_Timer *myatomtimer,uint32 Period)
 {
@@ -320,3 +333,18 @@ void AtomTimer_SetPeriod(IfxGtm_Atom_Timer *myatomtimer,uint32 Period)
   IfxGtm_Atom_Ch_setCompareShadow(myatomtimer->atom, myatomtimer->timerChannel, ActlPeriod, ActlDutyCycle);
   IfxGtm_Atom_Timer_applyUpdate(myatomtimer);
 }
+
+void AtomTimer_SetPeriodActl(IfxGtm_Atom_Timer *myatomtimer,uint32 Period)
+{
+  IfxGtm_Atom_Timer_disableUpdate(myatomtimer);
+  IfxGtm_Atom_Ch_setCompareZeroShadow(myatomtimer->atom, myatomtimer->timerChannel, Period);
+  IfxGtm_Atom_Timer_applyUpdate(myatomtimer);
+}
+
+void AtomTimer_SetDutyCycleAct(IfxGtm_Atom_Timer *myatomtimer, uint32 DutyCycle)
+{
+  IfxGtm_Atom_Timer_disableUpdate(myatomtimer);
+  IfxGtm_Atom_Ch_setCompareOneShadow(myatomtimer->atom, myatomtimer->timerChannel, DutyCycle);
+  IfxGtm_Atom_Timer_applyUpdate(myatomtimer);
+}
+

@@ -66,7 +66,11 @@ void TomPwmTimer_Init(IfxGtm_Tom_Timer *mytomtimer,uint32 Period,uint16 DutyCycl
 void TomTimer_SetDutyCycle(IfxGtm_Tom_Timer *mytomtimer, uint16 DutyCycle);
 void TomTimer_SetPeriod(IfxGtm_Tom_Timer *mytomtimer,uint32 Period);
 void TomTimer_SetDutyAndPeriod(IfxGtm_Tom_Timer *mytomtimer,uint16 DutyCycle,uint32 Period);
+void TomTimer_SetPeriodActl(IfxGtm_Tom_Timer *mytomtimer, uint16 Period, IfxGtm_Tom_Ch_ClkSrc Prescaler);
+void TomTimer_SetDutyCycleActl(IfxGtm_Tom_Timer *mytomtimer, uint16 DutyCycle);
 void AtomTimer_SetDutyCycle(IfxGtm_Atom_Timer *myatomtimer, uint16 DutyCycle);
 void AtomTimer_SetPeriod(IfxGtm_Atom_Timer *myatomtimer,uint32 Period);
+void AtomTimer_SetPeriodActl(IfxGtm_Atom_Timer *myatomtimer,uint32 Period);
+void AtomTimer_SetDutyCycleAct(IfxGtm_Atom_Timer *myatomtimer, uint32 DutyCycle);
 
 #endif /* INFINEONARDUINOLIKE_INTERRUPTS_H_ */
