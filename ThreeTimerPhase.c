@@ -63,9 +63,6 @@ IFX_STATIC void IfxGtmTomPwmThreeTimersUpdateOff(IfxGtm_Tom_PwmHl *driver, Ifx_T
 {
     IFX_UNUSED_PARAMETER(tOn)
     uint8 ChannelIndex;
-    Ifx_TimerValue period;
-
-    period = driver->timer->base.period;
 
     for (ChannelIndex = 0; ChannelIndex < driver->base.channelCount; ChannelIndex++)
     {

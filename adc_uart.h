@@ -30,6 +30,7 @@
 
 #include "Ifx_Types.h"
 #include "IfxVadc_Adc.h"
+#include "IfxAsclin_ASC.h"
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -50,17 +51,24 @@ typedef struct
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
+/* Group BackGround Adc functions */
 void init_vadc_background(IfxVadc_GroupId vadc_group,IfxVadc_ChannelId channel_id,IfxVadc_ChannelResult result_register);
 void run_vadc_background(void);
 void send_vadc_single(uint32 adcVal);
+/* Serial Interface Usb */
 void InitSerialInterface(void);
 void UartWriteWord(uint8 *message,Ifx_SizeT length);
 void UartWrite(uint8 *data, Ifx_SizeT length);
 void UartWriteln(uint8 *message,Ifx_SizeT length);
-void receive_data(uint8 *data, Ifx_SizeT length);
+void receive_data(Ifx_SizeT length);
+void UartWriteWithChar(uint8 *message,Ifx_SizeT length,char special_char);
+void UartRstRxBuffer(void);
+uint8 Get_UsbRxBufferIndex(Ifx_SizeT index);
+/* Group Scan Adc functions */
 void init_vadc_group(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup,uint8 channels_size);
 void run_vadc_group(uint32 channels);
+void Adc_ReadGroup(uint32* ChannelsRes ,uint8 channels);
 void send_vadc_group(uint32 chnIx, uint32 adcVal);
-void UartWriteWithChar(uint8 *message,Ifx_SizeT length,char special_char);
+uint32 Adc_ReturnChannelVal(uint8 channel);
 
 #endif /* ADC_UART_H_ */

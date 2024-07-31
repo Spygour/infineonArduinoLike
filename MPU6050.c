@@ -30,10 +30,7 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "MPU6050.h"
-#include "Ifx_Types.h"
-#include "IfxI2c_I2c.h"
-#include "Bsp.h"
-#include <stdint.h>
+
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -119,42 +116,40 @@ void initialize_mpu6050_values(){
         wait(Delay200ms);
 }
 
-void readData_mpu6050(){
+void readData_mpu6050()
+{
+  int16_t gyrolX, gyrolY, gyrolZ;
+  int16_t accelX, accelY, accelZ;
+  uint8 ACCEL_XOUT_H = 0x3B;
+  uint8 GYRO_XOUT_H = 0x43;
+  //uint8 ACCEL_XOUT_L = 0x3C;
+  //uint8 ACCEL_YOUT_H = 0x3D;
+  //uint8 ACCEL_YOUT_L = 0x3E;
+  //uint8 ACCEL_ZOUT_H = 0x3F;
+  //uint8 ACCEL_ZOUT_L = 0x40;//
 
-    uint8 ACCEL_XOUT_H = 0x3B;
-    uint8 GYRO_XOUT_H = 0x43;
-    //uint8 ACCEL_XOUT_L = 0x3C;
-    //uint8 ACCEL_YOUT_H = 0x3D;
-    //uint8 ACCEL_YOUT_L = 0x3E;
-   //uint8 ACCEL_ZOUT_H = 0x3F;
-    //uint8 ACCEL_ZOUT_L = 0x40;//
+  mpu6050_read(&ACCEL_XOUT_H, 6);
+  accelX = (int16_t)(i2cRxTxBuffer[0]<< 8 | i2cRxTxBuffer[1]);
+  accelY = (int16_t)(i2cRxTxBuffer[2]< 8 | i2cRxTxBuffer[3]);
+  accelZ = (int16_t)(i2cRxTxBuffer[4]<< 8 | i2cRxTxBuffer[5]);
 
-    mpu6050_read(&ACCEL_XOUT_H, 6);
-    int16_t accelX, accelY, accelZ;
-    accelX = (int16_t)(i2cRxTxBuffer[0]<< 8 | i2cRxTxBuffer[1]);
-    accelY = (int16_t)(i2cRxTxBuffer[2]< 8 | i2cRxTxBuffer[3]);
-    accelZ = (int16_t)(i2cRxTxBuffer[4]<< 8 | i2cRxTxBuffer[5]);
+  accelX_g = accelX / 16384.0;
+  accelY_g = accelY / 16384.0;
+  accelZ_g = accelZ / 16384.0;
 
-    accelX_g = accelX / 16384.0;
-    accelY_g = accelY / 16384.0;
-    accelZ_g = accelZ / 16384.0;
+  mpu6050_read(&GYRO_XOUT_H,6);
 
-    mpu6050_write(&GYRO_XOUT_H,6);
+  gyrolX = (int16_t)(i2cRxTxBuffer[0]<< 8 | i2cRxTxBuffer[1]);
+  gyrolY = (int16_t)(i2cRxTxBuffer[2]< 8 | i2cRxTxBuffer[3]);
+  gyrolZ = (int16_t)(i2cRxTxBuffer[4]<< 8 | i2cRxTxBuffer[5]);
 
-    int16_t gyrolX, gyrolY, gyrolZ;
-    gyrolX = (int16_t)(i2cRxTxBuffer[0]<< 8 | i2cRxTxBuffer[1]);
-    gyrolY = (int16_t)(i2cRxTxBuffer[2]< 8 | i2cRxTxBuffer[3]);
-    gyrolZ = (int16_t)(i2cRxTxBuffer[4]<< 8 | i2cRxTxBuffer[5]);
-
-    gyroX_g = accelX / 131.0;
-    gyroY_g = accelY / 131.0;
-    gyroZ_g = accelZ / 131.0;
-
-
-    //accelValues[0] = (int16_t)((i2cRxTxBuffer[0] << 8) | i2cRxTxBuffer[1]);
-    //accelValues[1] = (int16_t)((i2cRxTxBuffer[2] << 8) | i2cRxTxBuffer[3]);
-    //accelValues[2] = (int16_t)((i2cRxTxBuffer[4] << 8) | i2cRxTxBuffer[5]);
+  gyroX_g = gyrolX / 131.0;
+  gyroY_g = gyrolY / 131.0;
+  gyroZ_g = gyrolZ / 131.0;
 
 
+  //accelValues[0] = (int16_t)((i2cRxTxBuffer[0] << 8) | i2cRxTxBuffer[1]);
+  //accelValues[1] = (int16_t)((i2cRxTxBuffer[2] << 8) | i2cRxTxBuffer[3]);
+  //accelValues[2] = (int16_t)((i2cRxTxBuffer[4] << 8) | i2cRxTxBuffer[5]);
 }
 

@@ -43,8 +43,8 @@ typedef struct
 {
     Ifx_Pwm_Mode                 mode;                 /**< \brief Pwm Mode */
     boolean                      inverted;             /**< \brief Inverted configuration for the selected mode */
-    IfxGtm_Tom_Pwm3Timers_Update      set_mode;               /**< \brief update call back function for the selected mode */
-} IfxGtm_Tom_Pwm3Ch;
+    IfxGtm_Tom_Pwm3Timers_Update      setMode;               /**< \brief update call back function for the selected mode */
+} IfxGtm_Tom_Pwm3_Ch;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/

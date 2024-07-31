@@ -28,7 +28,6 @@
 #ifndef MPU6050_H_
 #define MPU6050_H_
 
-#include "MPU6050.h"
 #include "Ifx_Types.h"
 #include "IfxI2c_I2c.h"
 #include "Bsp.h"

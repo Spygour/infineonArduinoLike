@@ -54,7 +54,7 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void I2c_Init(IfxI2c_I2c* myi2c,IfxI2c_I2c_Device* myi2cdev,uint8 I2cAddress,float32 Baudrate);
+void I2c_Init(IfxI2c_I2c_Device* myi2cdev, IfxI2c_Scl_InOut* SclPin,IfxI2c_Sda_InOut* SdaPin,uint8 I2cAddress,float32 Baudrate);
 void I2c_Write(IfxI2c_I2c_Device* myi2cdev,uint8 *data,Ifx_SizeT size);
 void I2c_ReadBytes(IfxI2c_I2c_Device* myi2cdev,volatile uint8 *data,Ifx_SizeT size);
 void I2c_ReadRegister(IfxI2c_I2c_Device* myi2cdev,uint8 registerAddress, Ifx_SizeT size,volatile uint8* myRxTxBuffer);

@@ -29,7 +29,6 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 #include "adc_uart.h"
-#include "IfxAsclin_ASC.h"
 
 /*********************************************************************************************************************/
 /*********************************************************************************************************************/
@@ -37,15 +36,16 @@
 /*********************************************************************************************************************/
 #define TX_LENGTH 6
 
-#define VADC_GROUP IfxVadc_GroupId_4 /*Single channel set*/
-#define CHANNEL_ID  4 /*Channel ID for single vadc*/
+#define VADC_GROUP IfxVadc_GroupId_4   /*Single channel set*/
+#define CHANNEL_ID  4                  /*Channel ID for single vadc*/
 #define CHANNEL_RESULT_REGISTER     5 /*register where you will save the result for a single channel(this is not needed */
-#define N_CHANNELS 10  /*Number of channels for the group vadc initialize*/
+#define N_CHANNELS 8                  /*Number of channels for the group vadc initialize*/
 
-#define ISR_PRIORITY_ASCLIN_TX 1
-#define ISR_PRIORITY_ASCLIN_RX 2
-#define ISR_PRIORITY_ASCLIN_ER 3
-#define TX_PIN IfxAsclin0_TX_P14_0_OUT
+#define ISR_PRIORITY_ASCLIN_TX 10
+#define ISR_PRIORITY_ASCLIN_RX 11
+#define ISR_PRIORITY_ASCLIN_ER 12
+#define RX_PIN &IfxAsclin0_RXA_P14_1_IN
+#define TX_PIN &IfxAsclin0_TX_P14_0_OUT
 #define ASC_TX_BUFFER_SIZE 64
 #define ASC_RX_BUFFER_SIZE 64
 #define ASC_PRESCALER 1
@@ -63,6 +63,8 @@ uint8 SerialPrinBuffer[128] = {''};
 uint8 g_uartTxBuffer[ASC_TX_BUFFER_SIZE + sizeof(Ifx_Fifo) + 8];
 uint8 g_uartRxBuffer[ASC_RX_BUFFER_SIZE + sizeof(Ifx_Fifo) + 8];
 
+
+uint8 UsbRxBuffer[128] = {''};
 ApplicationVadcBackgroundScan g_vadcBackgroundScan;
 
 /*********************************************************************************************************************/
@@ -150,6 +152,7 @@ void run_vadc_group(uint32 channels)
         send_vadc_group(chnIx, conversionResult.B.RESULT);
     }
 }
+
 void send_vadc_group(uint32 chnIx, uint32 adcVal)
 {
     uint8 str[12] = {'C','h','.','X',':',' ','X','X','X','X','\n','\r'};  /* X to be replaced by correct values*/
@@ -167,65 +170,100 @@ void send_vadc_group(uint32 chnIx, uint32 adcVal)
     UartWrite(str, 12);
 }
 
-/*vadc single channel initialize and set part */
-void init_vadc_background(IfxVadc_GroupId vadc_group,IfxVadc_ChannelId channel_id,IfxVadc_ChannelResult result_register){
-    IfxVadc_Adc_Config adcConf;
-    IfxVadc_Adc_initModuleConfig(&adcConf,&MODULE_VADC);
 
-    IfxVadc_Adc_initModule(&g_vadcBackgroundScan.vadc,&adcConf);
-    IfxVadc_Adc_GroupConfig adcGroupConfig;
+void Adc_ReadGroup(uint32* ChannelsRes ,uint8 channels)
+{
+    uint32 chnIx;
 
-    IfxVadc_Adc_initGroupConfig(&adcGroupConfig,&g_vadcBackgroundScan.vadc);
-    adcGroupConfig.groupId = vadc_group;
-    adcGroupConfig.master = vadc_group;
+    /* Get the VADC conversions */
+    for(chnIx = 0; chnIx < channels; ++chnIx)
+    {
+        Ifx_VADC_RES conversionResult;
 
-    adcGroupConfig.arbiter.requestSlotBackgroundScanEnabled = TRUE;
-    adcGroupConfig.backgroundScanRequest.autoBackgroundScanEnabled = TRUE;
-    adcGroupConfig.backgroundScanRequest.triggerConfig.gatingMode = IfxVadc_GatingMode_always;
+        /* Wait for a new valid result */
+        do
+        {
+            conversionResult = IfxVadc_Adc_getResult(&g_adcChannel[chnIx]);
+        } while(!conversionResult.B.VF); /* B for Bitfield access, VF for Valid Flag */
+        ChannelsRes[chnIx] = conversionResult.B.RESULT;
+        /* Print the conversion to the UART */
+    }
+}
 
-    IfxVadc_Adc_initGroup(&g_vadcBackgroundScan.adcGroup,&adcGroupConfig);
 
-
-    IfxVadc_Adc_initChannelConfig(&g_vadcBackgroundScan.adcChannelConfig,&g_vadcBackgroundScan.adcGroup);
-    g_vadcBackgroundScan.adcChannelConfig.channelId = (IfxVadc_ChannelId)channel_id;
-    g_vadcBackgroundScan.adcChannelConfig.resultRegister = (IfxVadc_ChannelResult)result_register;
-    g_vadcBackgroundScan.adcChannelConfig.backgroundChannel = TRUE;
-    IfxVadc_Adc_initChannel(&g_vadcBackgroundScan.adcChannel,&g_vadcBackgroundScan.adcChannelConfig);
-
-    IfxVadc_Adc_setBackgroundScan(&g_vadcBackgroundScan.vadc,
-                                  &g_vadcBackgroundScan.adcGroup,
-                                  (1 << (IfxVadc_ChannelId)channel_id),
-                                  (1 << (IfxVadc_ChannelId)channel_id));
-    IfxVadc_Adc_startBackgroundScan(&g_vadcBackgroundScan.vadc);
+uint32 Adc_ReturnChannelVal(uint8 channel)
+{
+  Ifx_VADC_RES conversionResult;
+  do
+  {
+      conversionResult = IfxVadc_Adc_getResult(&g_adcChannel[channel]);
+  } while(!conversionResult.B.VF); /* B for Bitfield access, VF for Valid Flag */
+  return conversionResult.B.RESULT;
 }
 
 
 
-void run_vadc_background(void){
-    Ifx_VADC_RES conversionResult;
-    do
-    {
-        conversionResult = IfxVadc_Adc_getResult(&g_vadcBackgroundScan.adcChannel);
-    }while(!conversionResult.B.VF);
+/*vadc single channel initialize and set part */
+void init_vadc_background(IfxVadc_GroupId vadc_group,IfxVadc_ChannelId channel_id,IfxVadc_ChannelResult result_register)
+{
+  IfxVadc_Adc_Config adcConf;
+  IfxVadc_Adc_initModuleConfig(&adcConf,&MODULE_VADC);
 
-    send_vadc_single(conversionResult.B.RESULT);
+  IfxVadc_Adc_initModule(&g_vadcBackgroundScan.vadc,&adcConf);
+  IfxVadc_Adc_GroupConfig adcGroupConfig;
+
+  IfxVadc_Adc_initGroupConfig(&adcGroupConfig,&g_vadcBackgroundScan.vadc);
+  adcGroupConfig.groupId = vadc_group;
+  adcGroupConfig.master = vadc_group;
+
+  adcGroupConfig.arbiter.requestSlotBackgroundScanEnabled = TRUE;
+  adcGroupConfig.backgroundScanRequest.autoBackgroundScanEnabled = TRUE;
+  adcGroupConfig.backgroundScanRequest.triggerConfig.gatingMode = IfxVadc_GatingMode_always;
+
+  IfxVadc_Adc_initGroup(&g_vadcBackgroundScan.adcGroup,&adcGroupConfig);
+
+
+  IfxVadc_Adc_initChannelConfig(&g_vadcBackgroundScan.adcChannelConfig,&g_vadcBackgroundScan.adcGroup);
+  g_vadcBackgroundScan.adcChannelConfig.channelId = (IfxVadc_ChannelId)channel_id;
+  g_vadcBackgroundScan.adcChannelConfig.resultRegister = (IfxVadc_ChannelResult)result_register;
+  g_vadcBackgroundScan.adcChannelConfig.backgroundChannel = TRUE;
+  IfxVadc_Adc_initChannel(&g_vadcBackgroundScan.adcChannel,&g_vadcBackgroundScan.adcChannelConfig);
+
+  IfxVadc_Adc_setBackgroundScan(&g_vadcBackgroundScan.vadc,
+                                &g_vadcBackgroundScan.adcGroup,
+                                (1 << (IfxVadc_ChannelId)channel_id),
+                                (1 << (IfxVadc_ChannelId)channel_id));
+  IfxVadc_Adc_startBackgroundScan(&g_vadcBackgroundScan.vadc);
+}
+
+
+
+void run_vadc_background(void)
+{
+  Ifx_VADC_RES conversionResult;
+  do
+  {
+      conversionResult = IfxVadc_Adc_getResult(&g_vadcBackgroundScan.adcChannel);
+  }while(!conversionResult.B.VF);
+
+  send_vadc_single(conversionResult.B.RESULT);
 }
 
 
 void send_vadc_single(uint32 adcVal)
 {
-    uint8 str[TX_LENGTH] = {'X','X','X','X','\n','\r'};  /* X to be replaced by correct values*/
-                                    /* Channel index                    */
+  uint8 str[TX_LENGTH] = {'X','X','X','X','\n','\r'};  /* X to be replaced by correct values*/
+                                  /* Channel index                    */
 
-    /* Turns the digital converted value into its ASCII characters, e.g. 1054 -> '1','0','5','4' */
-    /* 12-bits range value: 0-4095 */
-    str[0] = (uint8)(adcVal / 1000) + 48;                                     /* Thousands                        */
-    str[1] = (uint8)((adcVal % 1000) / 100) + 48;                             /* Hundreds                         */
-    str[2] = (uint8)((adcVal % 100) / 10) + 48;                               /* Tens                             */
-    str[3] = (uint8)(adcVal % 10) + 48;                                       /* Units                            */
+  /* Turns the digital converted value into its ASCII characters, e.g. 1054 -> '1','0','5','4' */
+  /* 12-bits range value: 0-4095 */
+  str[0] = (uint8)(adcVal / 1000) + 48;                                     /* Thousands                        */
+  str[1] = (uint8)((adcVal % 1000) / 100) + 48;                             /* Hundreds                         */
+  str[2] = (uint8)((adcVal % 100) / 10) + 48;                               /* Tens                             */
+  str[3] = (uint8)(adcVal % 10) + 48;                                       /* Units                            */
 
-    /* Print via UART */
-    UartWrite(str, TX_LENGTH);
+  /* Print via UART */
+  UartWrite(str, TX_LENGTH);
 }
 /*uart ISR and read/write part */
 
@@ -236,35 +274,40 @@ void UartWriteWord(uint8 *message,Ifx_SizeT length)
 
 void UartWriteln(uint8 *message,Ifx_SizeT length)
 {
-        for (Ifx_SizeT i=0;i<length;i++){
-            SerialPrinBuffer[i] = message[i];
-        }
-        SerialPrinBuffer[length-1] = '\r';
-        SerialPrinBuffer[length] = '\n';
-        SerialPrinBuffer[length+1] = '\0';
-        Ifx_SizeT real_size = length+2;
-   IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
+  for (Ifx_SizeT i=0;i<length;i++)
+  {
+    SerialPrinBuffer[i] = message[i];
+  }
+  SerialPrinBuffer[length-1] = '\r';
+  SerialPrinBuffer[length] = '\n';
+  SerialPrinBuffer[length+1] = '\0';
+  Ifx_SizeT real_size = length+2;
+  IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
 }
 
 void UartWrite(uint8 *message,Ifx_SizeT length)
 {
-        for (Ifx_SizeT i=0;i<length;i++){
-            SerialPrinBuffer[i] = message[i];
-        }
-        SerialPrinBuffer[length-1] = '\r';
-        SerialPrinBuffer[length] = '\0';
-        Ifx_SizeT real_size = length+1;
-   IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
+  for (Ifx_SizeT i=0;i<length;i++)
+  {
+    SerialPrinBuffer[i] = message[i];
+  }
+  SerialPrinBuffer[length-1] = '\r';
+  SerialPrinBuffer[length] = '\0';
+  Ifx_SizeT real_size = length+1;
+  IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
 }
-void UartWriteWithChar(uint8 *message,Ifx_SizeT length,char special_char){
-            for (Ifx_SizeT i=0;i<length;i++){
-                SerialPrinBuffer[i] = message[i];
-            }
-            SerialPrinBuffer[length-1] = '\r';
-            SerialPrinBuffer[length] = special_char;
-            SerialPrinBuffer[length+1] = '\0';
-            Ifx_SizeT real_size = length+2;
-       IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
+
+void UartWriteWithChar(uint8 *message,Ifx_SizeT length,char special_char)
+{
+  for (Ifx_SizeT i=0;i<length;i++)
+  {
+    SerialPrinBuffer[i] = message[i];
+  }
+  SerialPrinBuffer[length-1] = '\r';
+  SerialPrinBuffer[length] = special_char;
+  SerialPrinBuffer[length+1] = '\0';
+  Ifx_SizeT real_size = length+2;
+  IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
 }
 
 
@@ -286,15 +329,30 @@ void asc0ErISR(void){
     IfxAsclin_Asc_isrError(&g_asc);
 }
 
-void receive_data(uint8 *data, Ifx_SizeT length)
+
+void receive_data(Ifx_SizeT length)
 {
     /* Receive data */
-    IfxAsclin_Asc_read(&g_asc, data, &length, TIME_INFINITE);
+    IfxAsclin_Asc_read(&g_asc, UsbRxBuffer, &length, TIME_INFINITE);
 }
+
+void UartRstRxBuffer(void)
+{
+  for (Ifx_SizeT i = 0; i < sizeof(UsbRxBuffer); i++)
+  {
+    UsbRxBuffer[i] = 0;
+  }
+}
+
+uint8 Get_UsbRxBufferIndex(Ifx_SizeT index)
+{
+    return UsbRxBuffer[index];
+}
+
 /*Uart initialize with USB*/
 void InitSerialInterface(void){
     IfxAsclin_Asc_Config ascConf;
-    IfxAsclin_Asc_initModuleConfig(&ascConf, TX_PIN.module);
+    IfxAsclin_Asc_initModuleConfig(&ascConf, IfxAsclin0_TX_P14_0_OUT.module);
 
     ascConf.baudrate.prescaler = ASC_PRESCALER;
     ascConf.baudrate.baudrate = ASC_BAUDRATE;                                   /* Set the baud rate in bit/s       */
@@ -311,11 +369,11 @@ void InitSerialInterface(void){
     const IfxAsclin_Asc_Pins pins = {
             .cts        = NULL_PTR,                         /* CTS pin not used                                     */
             .ctsMode    = IfxPort_InputMode_pullUp,
-            .rx         = &IfxAsclin0_RXA_P14_1_IN,         /* Select the pin for RX connected to the USB port      */
+            .rx         = RX_PIN,         /* Select the pin for RX connected to the USB port      */
             .rxMode     = IfxPort_InputMode_pullUp,         /* RX pin                                               */
             .rts        = NULL_PTR,                         /* RTS pin not used                                     */
             .rtsMode    = IfxPort_OutputMode_pushPull,
-            .tx         = &IfxAsclin0_TX_P14_0_OUT,         /* Select the pin for TX connected to the USB port      */
+            .tx         = TX_PIN,         /* Select the pin for TX connected to the USB port      */
             .txMode     = IfxPort_OutputMode_pushPull,      /* TX pin                                               */
             .pinDriver  = IfxPort_PadDriver_cmosAutomotiveSpeed1
     };

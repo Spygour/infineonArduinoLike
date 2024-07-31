@@ -29,7 +29,7 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include <kitronicTempSensor/Wire.h>
+#include "Wire.h"
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -54,24 +54,25 @@ void I2c_ReadRegister(IfxI2c_I2c_Device* myi2cdev,uint8 registerAddress, Ifx_Siz
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 //i2c init function
-void I2c_Init(IfxI2c_I2c* myi2c,IfxI2c_I2c_Device* myi2cdev,uint8 I2cAddress,float32 Baudrate)
+void I2c_Init(IfxI2c_I2c_Device* myi2cdev, IfxI2c_Scl_InOut* SclPin,IfxI2c_Sda_InOut* SdaPin,uint8 I2cAddress,float32 Baudrate)
 {
+    IfxI2c_I2c myi2c;
     IfxI2c_I2c_Config config;
-    IfxI2c_I2c_initConfig(&config, &MODULE_I2C0);
+    IfxI2c_I2c_initConfig(&config, SdaPin->module);
     const IfxI2c_Pins pins = {
-            &IfxI2c0_SCL_P13_1_INOUT,
-            &IfxI2c0_SDA_P13_2_INOUT,
+            SclPin,
+            SdaPin,
             IfxPort_PadDriver_ttlSpeed1
     };
     config.pins = &pins;
 
     config.baudrate = Baudrate;
 
-    IfxI2c_I2c_initModule(myi2c,&config);
+    IfxI2c_I2c_initModule(&myi2c,&config);
 
     //device config section
     IfxI2c_I2c_deviceConfig i2cDeviceConfig;
-    IfxI2c_I2c_initDeviceConfig(&i2cDeviceConfig, myi2c);
+    IfxI2c_I2c_initDeviceConfig(&i2cDeviceConfig, &myi2c);
     i2cDeviceConfig.deviceAddress = I2cAddress<<1;
     IfxI2c_I2c_initDevice(myi2cdev, &i2cDeviceConfig);
 }

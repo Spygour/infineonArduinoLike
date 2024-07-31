@@ -29,7 +29,7 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include <InfineonArduinoLike/PWM_GENERATOR.h>
+#include "PWM_GENERATOR.h"
 #include "math.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -141,18 +141,19 @@ void initAtomPwm(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyC
 /* This function sets the duty cycle of the PWM */
 void setDutyCycle_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle)
 {
-
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
     IfxGtm_Tom_Ch_setCompareOneShadow(mytomdriver->tom, mytomdriver->tomChannel, dutyCycle);
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
-void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period){
+void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period)
+{
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
     IfxGtm_Tom_Ch_setCompareZeroShadow(mytomdriver->tom, mytomdriver->tomChannel, period);
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
 
-void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock){
+void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock)
+{
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
     IfxGtm_Tom_Ch_setClockSource(mytomdriver->tom, mytomdriver->tomChannel, clock);
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
@@ -164,13 +165,15 @@ void setDutyCycle_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle)
     IfxGtm_Atom_Ch_setCompareOneShadow(myatomdriver->atom, myatomdriver->atomChannel, dutyCycle);
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
 }
-void setPeriod_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period){
+void setPeriod_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period)
+{
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,0);
     IfxGtm_Atom_Ch_setCompareZeroShadow(myatomdriver->atom, myatomdriver->atomChannel, period);
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
 }
 
-void setClock_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock){
+void setClock_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock)
+{
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,0);
     IfxGtm_Atom_Ch_setClockSource(myatomdriver->atom, myatomdriver->atomChannel, clock);
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
