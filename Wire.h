@@ -58,5 +58,7 @@ void I2c_Init(IfxI2c_I2c_Device* myi2cdev, IfxI2c_Scl_InOut* SclPin,IfxI2c_Sda_I
 void I2c_Write(IfxI2c_I2c_Device* myi2cdev,uint8 *data,Ifx_SizeT size);
 void I2c_ReadBytes(IfxI2c_I2c_Device* myi2cdev,volatile uint8 *data,Ifx_SizeT size);
 void I2c_ReadRegister(IfxI2c_I2c_Device* myi2cdev,uint8 registerAddress, Ifx_SizeT size,volatile uint8* myRxTxBuffer);
-
+void I2c_InitSlave(IfxI2c_I2c_Device* myi2cdev, IfxI2c_Scl_InOut* SclPin,IfxI2c_Sda_InOut* SdaPin,uint8 I2cAddress,float32 Baudrate);
+void I2c_ReadSlave(IfxI2c_I2c_Device* myi2cdev,Ifx_SizeT size,volatile uint8* I2cSlaveBuffer);
+void I2c_WriteSlave(IfxI2c_I2c_Device* myi2cdev,Ifx_SizeT size,volatile uint8* I2cSlaveBuffer);
 #endif /* INFINEONARDUINOLIKE_WIRE_H_ */

@@ -99,6 +99,39 @@ void I2c_ReadRegister(IfxI2c_I2c_Device* myi2cdev,uint8 registerAddress, Ifx_Siz
     while (IfxI2c_I2c_read(myi2cdev, myRxTxBuffer, size) == IfxI2c_I2c_Status_nak);
 }
 
+void I2c_InitSlave(IfxI2c_I2c_Device* myi2cdev, IfxI2c_Scl_InOut* SclPin,IfxI2c_Sda_InOut* SdaPin,uint8 I2cAddress,float32 Baudrate)
+{
+    IfxI2c_I2c myi2c;
+    IfxI2c_I2c_Config config;
+    IfxI2c_I2c_initConfig(&config, SdaPin->module);
+    const IfxI2c_Pins pins = {
+            SclPin,
+            SdaPin,
+            IfxPort_PadDriver_ttlSpeed1
+    };
+    config.pins = &pins;
+
+    config.baudrate = Baudrate;
+
+    IfxI2c_I2c_initSlaveModule(&myi2c,&config,I2cAddress);
+    //device config section
+    IfxI2c_I2c_deviceConfig i2cDeviceConfig;
+    IfxI2c_I2c_initDeviceConfig(&i2cDeviceConfig, &myi2c);
+    i2cDeviceConfig.deviceAddress = I2cAddress;
+    IfxI2c_I2c_initDevice(myi2cdev, &i2cDeviceConfig);
+}
+
+void I2c_ReadSlave(IfxI2c_I2c_Device* myi2cdev,Ifx_SizeT size,volatile uint8* I2cSlaveBuffer)
+{
+  while(IfxI2c_I2c_SlaveRead(myi2cdev,I2cSlaveBuffer,size) == IfxI2c_I2c_Status_nak);
+
+}
+
+void I2c_WriteSlave(IfxI2c_I2c_Device* myi2cdev,Ifx_SizeT size,volatile uint8* I2cSlaveBuffer)
+{
+  while(IfxI2c_I2c_SlaveWrite(myi2cdev,I2cSlaveBuffer,size) == IfxI2c_I2c_Status_nak);
+
+}
 
 
 
