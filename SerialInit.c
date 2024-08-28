@@ -304,12 +304,11 @@ void SerialremoveReadFifo(void)
     uint8 endChar = 10;
     for(Ifx_SizeT i=0;i<128;i++)
     {
-        SerialReadChar();
-        if(charCmp(endChar))
-
-           {
-            break;
-           }
+      SerialReadChar();
+      if(charCmp(endChar))
+      {
+        break;
+      }
     }
 }
 

@@ -29,6 +29,7 @@
 
 #include "RH_ASK.h"
 #include "Ifx_Types.h"
+#include "IfxQspi_SpiMaster.h"
 #include "pinsReadWrite.h"
 
 #include "Bsp.h"
