@@ -32,6 +32,7 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "IfxQspi_SpiMaster.h"
+#include "IfxQspi_SpiSlave.h"
 #include "Ifx_Types.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -53,6 +54,14 @@ typedef struct
     IfxQspi_Mtsr_Out* SpiMosi;
     IfxQspi_Mrst_In*  SpiMiso;
 }SpiMasterPins_t;
+
+typedef struct
+{
+    IfxQspi_Sclk_In*  SpiClkIn;
+    IfxQspi_Mtsr_In*  SpiMosi;
+    IfxQspi_Mrst_Out* SpiMiso;
+    IfxQspi_Slsi_In*  SpiChipSelect;
+}SpiSlavePins_t;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -75,5 +84,7 @@ void Spi_ReadRegister(IfxQspi_SpiMaster_Channel* SpiChannel, uint8 Reg, uint8* r
 void Spi_WriteBytes(IfxQspi_SpiMaster_Channel* SpiChannel, uint8* Src, uint8 size);
 void Spi_ReadBytes(IfxQspi_SpiMaster_Channel* SpiChannel,uint8* Src, uint8 SrcSize, uint8* Dest, uint8 DestSize);
 
+void Spi_SlaveInit(IfxQspi_SpiSlave* SpiSlave,SpiSlavePins_t* SpiSlavePins, SpiChannelConfig* ChannelConfig);
+void Spi_SlaveExchange(IfxQspi_SpiSlave* SpiSlave, uint8* SpiSlaveTx, uint8* SpiSlaveRx, uint8 size);
 
 #endif /* INFINEONARDUINOLIKE_SPI_H_ */

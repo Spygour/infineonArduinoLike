@@ -36,10 +36,15 @@
 #define ISR_PRIORITY_SPIMASTER_TX 43
 #define ISR_PRIORITY_SPIMASTER_RX 44
 #define ISR_PRIORITY_SPIMASTER_ER 45
+#define ISR_PRIORITY_SPISLAVE_TX 46
+#define ISR_PRIORITY_SPISLAVE_RX 47
+#define ISR_PRIORITY_SPISLAVE_ER 48
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
 IfxQspi_SpiMaster *SpiMaster1Ptr = NULL_PTR;
+IfxQspi_SpiSlave  *SpiSlave1Ptr = NULL_PTR;
+
 
 uint8 SpiTxBuffer[20];
 uint8 SpiRxBuffer[20];
@@ -57,6 +62,10 @@ uint8 SpiRxBuffer[20];
  IFX_INTERRUPT(SpimasterTxISR, 0, ISR_PRIORITY_SPIMASTER_TX);                  /* SPI Master ISR for transmit data         */
  IFX_INTERRUPT(SpimasterRxISR, 0, ISR_PRIORITY_SPIMASTER_RX);                  /* SPI Master ISR for receive data          */
  IFX_INTERRUPT(SpimasterErISR, 0, ISR_PRIORITY_SPIMASTER_ER);                 /* SPI Master ISR for error                 */
+ IFX_INTERRUPT(SpiSlaveTxISR, 0, ISR_PRIORITY_SPISLAVE_TX);                  /* SPI Master ISR for transmit data         */
+ IFX_INTERRUPT(SpiSlaveRxISR, 0, ISR_PRIORITY_SPISLAVE_RX);                  /* SPI Master ISR for receive data          */
+ IFX_INTERRUPT(SpiSlaverErISR, 0, ISR_PRIORITY_SPISLAVE_ER);                 /* SPI Master ISR for error                 */
+
  void SpimasterTxISR(void){
      IfxCpu_enableInterrupts();
      IfxQspi_SpiMaster_isrTransmit(SpiMaster1Ptr);
@@ -190,3 +199,79 @@ uint8 SpiRxBuffer[20];
 
  }
 
+
+ /*************************************************************************/
+ /************************** SPI Slave Part *******************************/
+ /*************************************************************************/
+
+ void SpiSlaveTxISR(void)
+ {
+     IfxCpu_enableInterrupts();
+     IfxQspi_SpiSlave_isrTransmit(SpiSlave1Ptr);
+ }
+
+ void SpiSlaveRxISR(void)
+ {
+     IfxCpu_enableInterrupts();
+     IfxQspi_SpiSlave_isrReceive(SpiSlave1Ptr);
+ }
+
+ void SpiSlaveErISR(void)
+ {
+     IfxCpu_enableInterrupts();
+     IfxQspi_SpiSlave_isrError(SpiSlave1Ptr);
+ }
+
+void Spi_SlaveInit(IfxQspi_SpiSlave* SpiSlave,SpiSlavePins_t* SpiSlavePins, SpiChannelConfig* ChannelConfig)
+{
+  SpiSlave1Ptr = SpiSlave;
+  // create module config
+  IfxQspi_SpiSlave_Config spiSlaveConfig;
+  IfxQspi_SpiSlave_initModuleConfig(&spiSlaveConfig, SpiSlavePins->SpiChipSelect->module);
+
+  // set the maximum baudrate
+  spiSlaveConfig.base.maximumBaudrate  = ChannelConfig->Baudrate;
+  spiSlaveConfig.protocol.clockPolarity = ChannelConfig->ClockPolarity;
+  spiSlaveConfig.protocol.dataHeading = ChannelConfig->DataHeading;
+
+  // pin configuration
+  const IfxQspi_SpiSlave_Pins slavePins = {
+      SpiSlavePins->SpiClkIn, IfxPort_InputMode_pullDown,   // SCLK Pin
+      SpiSlavePins->SpiMosi, IfxPort_InputMode_pullDown,   // MTSR Pin
+      SpiSlavePins->SpiMiso, IfxPort_OutputMode_pushPull,  // MRST Pin
+      SpiSlavePins->SpiChipSelect, IfxPort_InputMode_pullDown,   // SLSI Pin
+      IfxPort_PadDriver_cmosAutomotiveSpeed2 // pad driver mode
+  };
+  spiSlaveConfig.pins = &slavePins;
+
+  // ISR priorities and interrupt target
+  spiSlaveConfig.base.txPriority       = ISR_PRIORITY_SPISLAVE_TX;
+  spiSlaveConfig.base.rxPriority       = ISR_PRIORITY_SPISLAVE_RX;
+  spiSlaveConfig.base.erPriority       = ISR_PRIORITY_SPISLAVE_ER;
+  spiSlaveConfig.base.isrProvider      = IfxSrc_Tos_cpu0;
+
+  //spiSlaveConfig.qspi->GLOBALCON.B.STIP = 1;
+  // initialize module
+  IfxQspi_SpiSlave_initModule(SpiSlave, &spiSlaveConfig);
+
+}
+
+void Spi_SlaveExchange(IfxQspi_SpiSlave* SpiSlave, uint8* SpiSlaveTx, uint8* SpiSlaveRx, uint8 size)
+{
+  for (uint8 i = 0; i < size; i++)
+  {
+    SpiTxBuffer[i] = SpiSlaveTx[i];
+  }
+
+  while( IfxQspi_SpiSlave_getStatus(SpiSlave) == SpiIf_Status_busy );
+
+  IfxQspi_SpiSlave_exchange(SpiSlave, &SpiTxBuffer[0], &SpiRxBuffer[0], size);
+
+  while( IfxQspi_SpiSlave_getStatus(SpiSlave) == SpiIf_Status_busy );
+
+  for (uint8 i = 0; i< size; i++)
+  {
+    SpiSlaveRx[i] = SpiRxBuffer[i];
+  }
+
+}
