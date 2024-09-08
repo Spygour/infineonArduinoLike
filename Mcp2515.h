@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file Spi.h
+ * \file Mcp2515.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -25,52 +25,18 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-#ifndef INFINEONARDUINOLIKE_SPI_H_
-#define INFINEONARDUINOLIKE_SPI_H_
+#ifndef INFINEONARDUINOLIKE_MCP2515_H_
+#define INFINEONARDUINOLIKE_MCP2515_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "IfxQspi_SpiMaster.h"
-#include "IfxQspi_SpiSlave.h"
-#include "Ifx_Types.h"
+#include "Spi.h"
+#include "pinsReadWrite.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-typedef struct
-{
-    const IfxQspi_Slso_Out* ChannelOutput;
-    float32                Baudrate;
-    uint32                 ClockPolarity;
-    SpiIf_ShiftClock       ShiftClock;
-    SpiIf_DataHeading      DataHeading;
-}SpiChannelConfig;
 
-typedef IfxQspi_SpiMaster SpiMaster_t;
-typedef IfxQspi_SpiMaster_Channel SpiChannel_t;
-typedef struct
-{
-    IfxQspi_Sclk_Out* SpiClk;
-    IfxQspi_Mtsr_Out* SpiMosi;
-    IfxQspi_Mrst_In*  SpiMiso;
-}SpiMasterPins_t;
-
-typedef struct
-{
-    SpiMaster_t*          SpiMasterPtr;
-    uint8                 TxIsr;
-    uint8                 RxIsr;
-    uint8                 ErIsr;
-    boolean               IsActive;
-}SpiMasterCfg_t;
-
-typedef struct
-{
-    IfxQspi_Sclk_In*  SpiClkIn;
-    IfxQspi_Mtsr_In*  SpiMosi;
-    IfxQspi_Mrst_Out* SpiMiso;
-    IfxQspi_Slsi_In*  SpiChipSelect;
-}SpiSlavePins_t;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -78,7 +44,13 @@ typedef struct
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
- 
+ typedef enum
+{
+  KBPS_125,
+  KBPS_250,
+  KBPS_500,
+  KBPS_1000
+}MCP2515_BAUDRATE;
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -86,14 +58,13 @@ typedef struct
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void Spi_Init(SpiMasterPins_t* SpiMasterPins, SpiMasterCfg_t* MasterCfg);
-void Spi_ChannelInit(SpiMasterCfg_t* SpiMasterCfg, SpiChannel_t* SpiChannel, SpiChannelConfig* ChannelConfig);
-void Spi_WriteRegister(SpiChannel_t* SpiChannel, uint8 Reg);
-void Spi_ReadRegister(SpiChannel_t* SpiChannel, uint8 Reg, uint8* regVal, uint8 size);
-void Spi_WriteBytes(SpiChannel_t* SpiChannel, uint8* Src, uint8 size);
-void Spi_ReadBytes(SpiChannel_t* SpiChannel,uint8* Src, uint8 SrcSize, uint8* Dest, uint8 DestSize);
+ void SpimasterTxMcp2515(void);
+ void SpimasterRxMcp2515(void );
+ void SpimasterErMcp2515(void);
+void Mcp2515_Init(void);
+void Mcp2515_SetBaudrate(MCP2515_BAUDRATE Baudrate);
+boolean Mcp2515_SetRegNum(uint8 Num);
+void Mcp2515_SetTransmitMsgId(uint16 CanId, boolean extIdentifier, uint32 Identifier);
+boolean Mcp2515_Transmit(uint8* CanMsg, uint8 CanMsgSize);
 
-void Spi_SlaveInit(IfxQspi_SpiSlave* SpiSlave,SpiSlavePins_t* SpiSlavePins, SpiChannelConfig* ChannelConfig);
-void Spi_SlaveExchange(IfxQspi_SpiSlave* SpiSlave, uint8* SpiSlaveTx, uint8* SpiSlaveRx, uint8 size);
-
-#endif /* INFINEONARDUINOLIKE_SPI_H_ */
+#endif /* INFINEONARDUINOLIKE_MCP2515_H_ */

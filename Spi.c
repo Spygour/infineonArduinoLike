@@ -33,16 +33,14 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define ISR_PRIORITY_SPIMASTER_TX 43
-#define ISR_PRIORITY_SPIMASTER_RX 44
-#define ISR_PRIORITY_SPIMASTER_ER 45
-#define ISR_PRIORITY_SPISLAVE_TX 46
-#define ISR_PRIORITY_SPISLAVE_RX 47
-#define ISR_PRIORITY_SPISLAVE_ER 48
+#define ISR_PRIORITY_SPISLAVE_TX 55
+#define ISR_PRIORITY_SPISLAVE_RX 56
+#define ISR_PRIORITY_SPISLAVE_ER 57
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
-IfxQspi_SpiMaster *SpiMaster1Ptr = NULL_PTR;
+
+
 IfxQspi_SpiSlave  *SpiSlave1Ptr = NULL_PTR;
 
 
@@ -59,31 +57,17 @@ uint8 SpiRxBuffer[20];
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
- IFX_INTERRUPT(SpimasterTxISR, 0, ISR_PRIORITY_SPIMASTER_TX);                  /* SPI Master ISR for transmit data         */
- IFX_INTERRUPT(SpimasterRxISR, 0, ISR_PRIORITY_SPIMASTER_RX);                  /* SPI Master ISR for receive data          */
- IFX_INTERRUPT(SpimasterErISR, 0, ISR_PRIORITY_SPIMASTER_ER);                 /* SPI Master ISR for error                 */
+
+
  IFX_INTERRUPT(SpiSlaveTxISR, 0, ISR_PRIORITY_SPISLAVE_TX);                  /* SPI Master ISR for transmit data         */
  IFX_INTERRUPT(SpiSlaveRxISR, 0, ISR_PRIORITY_SPISLAVE_RX);                  /* SPI Master ISR for receive data          */
  IFX_INTERRUPT(SpiSlaverErISR, 0, ISR_PRIORITY_SPISLAVE_ER);                 /* SPI Master ISR for error                 */
 
- void SpimasterTxISR(void){
-     IfxCpu_enableInterrupts();
-     IfxQspi_SpiMaster_isrTransmit(SpiMaster1Ptr);
- }
 
- void SpimasterRxISR(void ){
-     IfxCpu_enableInterrupts();
-     IfxQspi_SpiMaster_isrReceive(SpiMaster1Ptr);
- }
 
- void SpimasterErISR(void){
-     IfxCpu_enableInterrupts();
-     IfxQspi_SpiMaster_isrError(SpiMaster1Ptr);
- }
-
- void Spi_Init(IfxQspi_SpiMaster* SpiMaster, SpiMasterPins_t* SpiMasterPins)
+ /* Spi Master Functions */
+ void Spi_Init(SpiMasterPins_t* SpiMasterPins, SpiMasterCfg_t* MasterCfg)
  {
-   SpiMaster1Ptr = SpiMaster;
    IfxQspi_SpiMaster_Config spiMasterConfig;                           /* Define a Master configuration            */
 
    IfxQspi_SpiMaster_initModuleConfig(&spiMasterConfig, SpiMasterPins->SpiMosi->module); /* Initialize it with default values        */
@@ -95,26 +79,28 @@ uint8 SpiRxBuffer[20];
        SpiMasterPins->SpiClk, IfxPort_OutputMode_pushPull,          /* SCLK Pin                       (CLK)     */
        SpiMasterPins->SpiMosi, IfxPort_OutputMode_pushPull,          /* MasterTransmitSlaveReceive pin (MOSI)    */
        SpiMasterPins->SpiMiso, IfxPort_InputMode_pullDown,           /* MasterReceiveSlaveTransmit pin (MISO)    */
-       IfxPort_PadDriver_cmosAutomotiveSpeed3                          /* Pad driver mode                          */
+       IfxPort_PadDriver_cmosAutomotiveSpeed2                          /* Pad driver mode                          */
    };
    /* Select the port pins for communication */
    spiMasterConfig.pins = &SpiMasterPinsCfg;                            /* Assign the Master's port pins            */
 
    /* Set the ISR priorities and the service provider */
-   spiMasterConfig.base.txPriority = ISR_PRIORITY_SPIMASTER_TX;
-   spiMasterConfig.base.rxPriority = ISR_PRIORITY_SPIMASTER_RX;
-   spiMasterConfig.base.erPriority = ISR_PRIORITY_SPIMASTER_ER;
+   spiMasterConfig.base.txPriority = MasterCfg->TxIsr;
+   spiMasterConfig.base.rxPriority = MasterCfg->RxIsr;
+   spiMasterConfig.base.erPriority = MasterCfg->ErIsr;
    spiMasterConfig.base.isrProvider = IfxSrc_Tos_cpu0;
    /* Initialize the QSPI Master module */
-   IfxQspi_SpiMaster_initModule(SpiMaster, &spiMasterConfig);
+   IfxQspi_SpiMaster_initModule(MasterCfg->SpiMasterPtr, &spiMasterConfig);
+
+   MasterCfg->IsActive = TRUE;
  }
 
- void Spi_ChannelInit(IfxQspi_SpiMaster* SpiMaster, IfxQspi_SpiMaster_Channel* SpiChannel, SpiChannelConfig* ChannelConfig)
+ void Spi_ChannelInit(SpiMasterCfg_t* SpiMasterCfg, SpiChannel_t* SpiChannel, SpiChannelConfig* ChannelConfig)
  {
    IfxQspi_SpiMaster_ChannelConfig spiMasterChannelConfig;             /* Define a Master Channel configuration    */
 
    /* Initialize the configuration with default values */
-   IfxQspi_SpiMaster_initChannelConfig(&spiMasterChannelConfig, SpiMaster);
+   IfxQspi_SpiMaster_initChannelConfig(&spiMasterChannelConfig, SpiMasterCfg->SpiMasterPtr);
 
    const IfxQspi_SpiMaster_Output SpiSlaveSelect = {                 /* QSPI1 Master selects the QSPI3 Slave     */
        ChannelConfig->ChannelOutput, IfxPort_OutputMode_pushPull,         /* Slave Select port pin (CS)               */
@@ -128,7 +114,7 @@ uint8 SpiRxBuffer[20];
    spiMasterChannelConfig.base.mode.shiftClock = ChannelConfig->ShiftClock;
    spiMasterChannelConfig.base.mode.dataHeading = ChannelConfig->DataHeading;
    spiMasterChannelConfig.base.mode.parityCheck = 0;
-   spiMasterChannelConfig.base.mode.autoCS =0;
+   spiMasterChannelConfig.base.mode.autoCS = 0;
 
    /* Select the port pin for the Chip Select signal */
 
@@ -137,7 +123,7 @@ uint8 SpiRxBuffer[20];
    IfxQspi_SpiMaster_initChannel(SpiChannel, &spiMasterChannelConfig);
  }
 
- void Spi_WriteRegister(IfxQspi_SpiMaster_Channel* SpiChannel, uint8 Reg)
+ void Spi_WriteRegister(SpiChannel_t* SpiChannel, uint8 Reg)
  {
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
    SpiTxBuffer[0] = Reg;
@@ -148,7 +134,7 @@ uint8 SpiRxBuffer[20];
 
  }
 
- void Spi_ReadRegister(IfxQspi_SpiMaster_Channel* SpiChannel, uint8 Reg, uint8* regVal, uint8 size)
+ void Spi_ReadRegister(SpiChannel_t* SpiChannel, uint8 Reg, uint8* regVal, uint8 size)
  {
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
    SpiTxBuffer[0] =  Reg;
@@ -167,7 +153,7 @@ uint8 SpiRxBuffer[20];
    }
  }
 
- void Spi_WriteBytes(IfxQspi_SpiMaster_Channel* SpiChannel, uint8* Src, uint8 size)
+ void Spi_WriteBytes(SpiChannel_t* SpiChannel, uint8* Src, uint8 size)
  {
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
    for(uint8 i = 0; i < size; i++)
@@ -175,26 +161,30 @@ uint8 SpiRxBuffer[20];
      SpiTxBuffer[i] = Src[i];
    }
        // receive new stream
-   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], &SpiRxBuffer[0], size);
+   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], NULL_PTR, size);
 
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
  }
 
- void Spi_ReadBytes(IfxQspi_SpiMaster_Channel* SpiChannel,uint8* Src, uint8 SrcSize, uint8* Dest, uint8 DestSize)
+ void Spi_ReadBytes(SpiChannel_t* SpiChannel,uint8* Src, uint8 SrcSize, uint8* Dest, uint8 DestSize)
  {
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
    for(uint8 i=0;i<SrcSize;i++)
    {
      SpiTxBuffer[i] = Src[i];
    }
+   for(uint8 i = SrcSize; i < SrcSize+DestSize; i++)
+   {
+     SpiTxBuffer[i] = 0xFF;
+   }
        // receive new stream
-   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], &SpiRxBuffer[0], DestSize+1);
+   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], &SpiRxBuffer[0], SrcSize + DestSize);
 
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
 
    for(uint8 i = 0; i < DestSize; i++)
    {
-     Dest[i] = SpiRxBuffer[i+1];
+     Dest[i] = SpiRxBuffer[i+SrcSize];
    }
 
  }
