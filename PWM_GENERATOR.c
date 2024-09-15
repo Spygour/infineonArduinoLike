@@ -47,6 +47,8 @@
 /*********************************************************************************************************************/
 IfxGtm_Tom_Pwm_Config tomPwmConfig;
 IfxGtm_Atom_Pwm_Config atomPwmConfig;
+boolean TomModuleInit = FALSE;
+boolean AtomModuleInit = FALSE;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -54,7 +56,7 @@ IfxGtm_Atom_Pwm_Config atomPwmConfig;
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 /* Initialization functions */
-static void initTomPwmConfig(uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin,Ifx_GTM *gtm)
+static inline void initTomPwmConfig(uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin,Ifx_GTM *gtm)
 {
     tomPwmConfig.gtm                      = gtm;
     tomPwmConfig.tom                      = pin->tom;
@@ -76,7 +78,7 @@ static void initTomPwmConfig(uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_
     tomPwmConfig.pin.padDriver            = IfxPort_PadDriver_cmosAutomotiveSpeed1;
 }
 
-void initAtomPwmConfig(uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin,Ifx_GTM *gtm)
+static inline void initAtomPwmConfig(uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin,Ifx_GTM *gtm)
 {
     atomPwmConfig.gtm                      = gtm;
     atomPwmConfig.atom                     = pin->atom;
@@ -98,13 +100,13 @@ void initAtomPwmConfig(uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin,I
     atomPwmConfig.pin.padDriver            = IfxPort_PadDriver_cmosAutomotiveSpeed1;
 }
 
-void initTomPwmDriver(IfxGtm_Tom_Pwm_Driver *Tomdriver)
+static inline void initTomPwmDriver(IfxGtm_Tom_Pwm_Driver *Tomdriver)
 {
     IfxGtm_Tom_Pwm_init(Tomdriver, &tomPwmConfig);                 /* Initialize the PWM                       */
     IfxGtm_Tom_Pwm_start(Tomdriver, TRUE);                         /* Start the PWM                            */
 }
 
-void initAtomPwmDriver(IfxGtm_Atom_Pwm_Driver *Atomdriver)
+static inline void initAtomPwmDriver(IfxGtm_Atom_Pwm_Driver *Atomdriver)
 {
     IfxGtm_Atom_Pwm_init(Atomdriver, &atomPwmConfig);                 /* Initialize the PWM                       */
     IfxGtm_Atom_Pwm_start(Atomdriver, TRUE);
@@ -113,66 +115,73 @@ void initAtomPwmDriver(IfxGtm_Atom_Pwm_Driver *Atomdriver)
 
 
 /* This function initializes the TOM */
-void initTomPwm(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin)
+void TomPwm_Init(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin)
 {
+  if (TomModuleInit == FALSE)
+  {
     IfxGtm_enable(&MODULE_GTM);                                     /* Enable GTM                                   */
 
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);   /* Enable the FXU clock                         */
-
-    /* Initialize the configuration structure with default parameters */
-    initTomPwmConfig(period,dutyCycle,clock,pin,&MODULE_GTM);
-    initTomPwmDriver(mytomdriver);            /* Initialize the PWM                       */
+    TomModuleInit = TRUE;
+  }
+  /* Initialize the configuration structure with default parameters */
+  initTomPwmConfig(period,dutyCycle,clock,pin,&MODULE_GTM);
+  initTomPwmDriver(mytomdriver);            /* Initialize the PWM                       */
 }
 
-void initAtomPwm(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin)
+void AtomPwm_Init(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin)
 {
+  if (AtomModuleInit == FALSE)
+  {
     IfxGtm_enable(&MODULE_GTM); /* Enable GTM */
 
     IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_5, CLK_FREQ);        /* Set the CMU clock 0 frequency    */
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_CLK0);                /* Enable the CMU clock 0           */
+    AtomModuleInit = TRUE;
+  }
 
-    initAtomPwmConfig(period,dutyCycle,pin,&MODULE_GTM);
+  initAtomPwmConfig(period,dutyCycle,pin,&MODULE_GTM);
 
-    initAtomPwmDriver(myatomdriver);            /* Initialize the PWM                       */
+  initAtomPwmDriver(myatomdriver);            /* Initialize the PWM                       */
 
 }
 
 
 /* This function sets the duty cycle of the PWM */
-void setDutyCycle_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle)
+void TomPwm_SetDutyCycle(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle)
 {
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
     IfxGtm_Tom_Ch_setCompareOneShadow(mytomdriver->tom, mytomdriver->tomChannel, dutyCycle);
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
-void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period)
+void TomPwm_SetPeriod(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period)
 {
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
     IfxGtm_Tom_Ch_setCompareZeroShadow(mytomdriver->tom, mytomdriver->tomChannel, period);
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
 
-void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock)
+void TomPwm_SetClock(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock)
 {
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,0);
     IfxGtm_Tom_Ch_setClockSource(mytomdriver->tom, mytomdriver->tomChannel, clock);
     IfxGtm_Tom_Tgc_enableChannelUpdate(mytomdriver->tgc[0],mytomdriver->tomChannel,1);
 }
 
-void setDutyCycle_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle)
+void AtomPwm_SetDutyCycle(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle)
 {
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,0);
     IfxGtm_Atom_Ch_setCompareOneShadow(myatomdriver->atom, myatomdriver->atomChannel, dutyCycle);
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
 }
-void setPeriod_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period)
+void AtomPwm_SetPeriod(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period)
 {
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,0);
     IfxGtm_Atom_Ch_setCompareZeroShadow(myatomdriver->atom, myatomdriver->atomChannel, period);
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
 }
 
-void setClock_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock)
+void AtomPwm_SetClock(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock)
 {
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,0);
     IfxGtm_Atom_Ch_setClockSource(myatomdriver->atom, myatomdriver->atomChannel, clock);

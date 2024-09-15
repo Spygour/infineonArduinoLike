@@ -53,14 +53,14 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void initTomPwm(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin);
-void initAtomPwm(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin);
-void setPeriod_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period);
-void setClock_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock);
-void setPeriod_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period);
-void setClock_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock);
-void setDutyCycle_tom(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle);
-void setDutyCycle_atom(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle);
+void TomPwm_Init(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin);
+void AtomPwm_Init(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin);
+void TomPwm_SetPeriod(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period);
+void TomPwm_SetClock(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 clock);
+void AtomPwm_SetPeriod(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period);
+void AtomPwm_SetClock(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock);
+void TomPwm_SetDutyCycle(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 dutyCycle);
+void AtomPwm_SetDutyCycle(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 dutyCycle);
 
 
 #endif /* PWM_AND_DIGITALREADWRITE_H_ */

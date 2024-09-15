@@ -289,7 +289,7 @@ void timerSetup(){
             return;
     }
 
-    initTomInterrupt(&RHASK_tom,nticks,15,1,4, prescaler);
+    TomInterrupt_Init(&RHASK_tom,nticks,15,1,4, prescaler);
 
 }
 

@@ -57,10 +57,9 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void initTomInterrupt(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,uint16 tom,uint16 channel, uint16 clock);
-void initAtomInterrupt(IfxGtm_Atom_Timer* mytimer,float32 frequency, uint16 priority,uint16 atom,uint16 channel);
-void initGpt12interrupt(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,IfxGpt12_TimerInputPrescaler timerPrescaler,uint16 priority);
-void interruptGpt12(void);
+void TomInterrupt_Init(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,uint16 tom,uint16 channel, uint16 clock);
+void AtomInterrupt_Init(IfxGtm_Atom_Timer* mytimer,float32 frequency, uint16 priority,uint16 atom,uint16 channel);
+void Gpt12interrupt_Init(uint16 reload,IfxGpt12_Gpt1BlockPrescaler gtp1prescaler,IfxGpt12_TimerInputPrescaler timerPrescaler,uint16 priority);
 /*Tom Pwm timer test function*/
 void TomPwmTimer_Init(IfxGtm_Tom_Timer *mytomtimer,uint32 Period,uint16 DutyCycle,IfxGtm_Tom_ToutMap* pin);
 void TomTimer_SetDutyCycle(IfxGtm_Tom_Timer *mytomtimer, uint16 DutyCycle);
