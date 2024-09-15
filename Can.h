@@ -66,8 +66,8 @@ typedef struct
 /*********************************************************************************************************************/
 void canIsrRxHandler(void);
 void Can_InitNode0(void);
-void Can_InitTransmitMsgObj(uint32 CanId);
+void Can_InitTransmitMsgObj(uint32 CanId, uint32 ExtendedId , uint8 CanDataLength, boolean extended );
 void Can_InitReceiveMsgObj(uint32 CanId);
-void transmitCanMessage(uint32 dataLow, uint32 dataHigh);
+void Can_TransmitMsg(uint8* Msg, uint8 size);
 
 #endif /* INFINEONARDUINOLIKE_CAN_H_ */

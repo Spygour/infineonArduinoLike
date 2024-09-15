@@ -37,24 +37,52 @@
 #define WRITE_COMMAND 2
 #define READ_COMMAND 3
 #define BIT_MODIFY 5
+#define SPIBAUDRATE 10000000.0
 
 /* Can Transmit Registers */
-#define CNF1     0x2A
-#define CNF2     0x29
-#define CNF3     0x28
-#define TXB1CTRL 0x30
-#define TXB2CTRL 0x40
-#define TXB3CTRL 0x50
+#define CNF1      0x2A
+#define CNF2      0x29
+#define CNF3      0x28
+#define TXB1CTRL  0x30
+#define TXB2CTRL  0x40
+#define TXB3CTRL  0x50
 #define TXRTSCTRL 0x0D
-#define TXB1SIDH 0x31
-#define TXB1SIDL 0x32
-#define TXB1EID8 0x33
-#define TXB1EID0 0x34
-#define TXB1DLC  0x35
-#define TXB1D0   0x36
-#define CANCTRL  0xF
-#define CANSTAT  0xE
-#define SPIBAUDRATE 10000000.0
+#define TXB1SIDH  0x31
+#define TXB1SIDL  0x32
+#define TXB1EID8  0x33
+#define TXB1EID0  0x34
+#define TXB1DLC   0x35
+#define TXB1D0    0x36
+#define CANCTRL   0xF
+#define CANSTAT   0xE
+
+
+/* Can Receive Registers */
+#define RXM0SIDH 0x20
+#define RXM1SIDH 0x24
+#define RXM0SIDL 0x21
+#define RXM1SIDL 0x25
+#define RXM0EID8 0x22
+#define RXM1EID8 0x26
+#define RXM0EID0 0x23
+#define RXM1EID0 0x27
+#define RXB0CTRL 0x60
+#define RXB1CTRL 0x70
+#define CANINTE  0x2B
+#define CANINTF  0x2C
+#define RXB0SIDH 0x61
+#define RXB1SIDH 0x71
+#define RXB0SIDL 0x62
+#define RXB1SIDL 0x72
+#define RXB0EID8 0x63
+#define RXB1EID8 0x73
+#define RXB0EID0 0x64
+#define RXB1EID0 0x74
+#define RXB0DLC  0x65
+#define RXB1DLC  0x75
+#define RXB0DM   0x66
+#define RXB1DM   0x76
+#define EFLG     0x2D
 
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
@@ -92,6 +120,68 @@ uint8 Mcp2515ReadBuffer[30];
 uint8 regNum = 0;
 
 MCP2515_BAUDRATE Mcp2515Baudrate;
+
+uint8 Mcp2515Rx0[8];
+uint8 Mcp2515Rx1[8];
+uint8 Mcp2515Rx2[8];
+uint8 Mcp2515Rx3[8];
+uint8 Mcp2515Rx4[8];
+uint8 Mcp2515Rx5[8];
+
+MCP2515_MESSAGE Mcp2515MsgRx[6]=
+{
+    {
+        0x315A2,
+        0x100,
+        FALSE,
+        Mcp2515Rx0,
+        0x00
+    },
+    {
+        0x315A2,
+        0x380,
+        FALSE,
+        Mcp2515Rx1,
+        0x04
+    },
+    {
+        0x315A2,
+        0x7A8,
+        FALSE,
+        Mcp2515Rx2,
+        0x08
+    },
+    {
+        0x315A2,
+        0x080,
+        FALSE,
+        Mcp2515Rx3,
+        0x10
+    },
+    {
+        0x315A2,
+        0x2FF,
+        FALSE,
+        Mcp2515Rx4,
+        0x14
+    },
+    {
+        0x315A2,
+        0x0A3,
+        FALSE,
+        Mcp2515Rx5,
+        0x18
+    }
+};
+
+
+MCP2515_RECEIVE_RES Mcp2515ReceiveRes =
+{
+    STANDARD_IDS_MODE,
+    Mcp2515MsgRx,
+    6,
+    0
+};
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -103,6 +193,8 @@ static inline boolean Mcp2515_checkMsgSent(void);
 static inline void Mcp2515_WriteRegister(uint8 Register, uint8 Command);
 static inline void Mcp2515_BitModifyReg(uint8 Register, uint8 Mask, uint8 Value);
 static inline void Mcp2515_ReadRegister(uint8 Register, uint8 RegsNum);
+
+static inline void Mcp2515_SetupMessages(void);
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
@@ -142,22 +234,17 @@ void Mcp2515_Init(void)
   Mcp2515_WriteRegister(CANCTRL, 0x80);
   Mcp2515_ReadRegister(CANCTRL, 1);
 
+  /* Set up Masks that will be checked during the receive of message */
+  Mcp2515_SetupMessages();
+
   Mcp2515_ReadRegister(CANSTAT,1);
 
   /* Set Baudrate 500000 */
   Mcp2515Baudrate = KBPS_500;
 
-  Mcp2515_ReadRegister(CNF1, 1);
-  Mcp2515_ReadRegister(CNF2, 1);
-  Mcp2515_ReadRegister(CNF3, 1);
-
   Mcp2515_WriteRegister(CNF3, 0x82);
   Mcp2515_WriteRegister(CNF2, 0x90);
   Mcp2515_WriteRegister(CNF1, 0x00);
-
-  Mcp2515_ReadRegister(CNF1, 1);
-  Mcp2515_ReadRegister(CNF2, 1);
-  Mcp2515_ReadRegister(CNF3, 1);
 
   Mcp2515_BitModifyReg(CANCTRL, 0xE0, 0x00);
   Mcp2515_ReadRegister(CANCTRL, 1);
@@ -165,7 +252,17 @@ void Mcp2515_Init(void)
   uint8 TXBnCTRL = TXB1CTRL + regNum*0x10;
   uint8 TxBnCTRLcmd = 0x3;
   Mcp2515_BitModifyReg(TXBnCTRL, 0xB ,TxBnCTRLcmd);
-  //setPinOutputTrue(&MODULE_P11,2);
+
+  /* Set up the receive mode to be standard by default */
+  Mcp2515_BitModifyReg(RXB0CTRL, 0x64, (Mcp2515ReceiveRes.CanReceiveMode<<5) | 0x4 );
+  Mcp2515_BitModifyReg(RXB1CTRL, 0x64, (Mcp2515ReceiveRes.CanReceiveMode<<5) | 0x4);
+
+  /* Enable RX INTERRUPTS WHEN RX BUFFERS ARE FULL */
+  Mcp2515_ReadRegister(CANINTE, 1);
+  Mcp2515_WriteRegister(CANINTE,Mcp2515ReadBuffer[0] | 0x03);
+
+  /* Set up Masks that will be checked during the receive of message */
+  Mcp2515_SetupMessages();
 }
 
 
@@ -236,6 +333,7 @@ static inline void Mcp2515_WriteRegister(uint8 Register, uint8 Command)
   Spi_WriteBytes(&Mcp2515Channel, SpiBuffer, 3);
 }
 
+
 static inline void Mcp2515_WriteRegisters(uint8 StartReg, uint8* Command, uint8 CommandSize)
 {
   uint8 SpiBuffer[CommandSize+2];
@@ -243,10 +341,11 @@ static inline void Mcp2515_WriteRegisters(uint8 StartReg, uint8* Command, uint8 
   SpiBuffer[1] = StartReg;
   for(uint8 i = 0; i < CommandSize; i++)
   {
-    SpiBuffer[i+2] = Command[i];
+    SpiBuffer[i+2] = Command[(CommandSize -1)-i];
   }
   Spi_WriteBytes(&Mcp2515Channel, SpiBuffer, CommandSize+2);
 }
+
 
 static inline void Mcp2515_BitModifyReg(uint8 Register, uint8 Mask, uint8 Value)
 {
@@ -351,4 +450,372 @@ static inline boolean Mcp2515_checkMsgSent(void)
   {
     return FALSE;
   }
+}
+
+
+/* Receive functions (setup and Read) */
+static inline void Mcp2515_SetupMessages(void)
+{
+  for (uint8 i = 0; i < Mcp2515ReceiveRes.CanReceiveMsgSize; i++)
+  {
+    Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg, (uint8)(Mcp2515ReceiveRes.CanReceivedMsg[i].StandardId>>3));
+    Mcp2515_ReadRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg, 1);
+    if (Mcp2515ReceiveRes.CanReceiveMode == EXTENDED_IDS_MODE)
+    {
+      uint8 RXFnSIDL = (uint8)((Mcp2515ReceiveRes.CanReceivedMsg[i].StandardId<<5) & 0xFF)|8|(uint8)((Mcp2515ReceiveRes.CanReceivedMsg[i].ExtendedId>>16) &0xFF);
+      Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+1, RXFnSIDL);
+      Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+2, (uint8)((Mcp2515ReceiveRes.CanReceivedMsg[i].ExtendedId>>8) & 0xFF));
+      Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+3, (uint8)(Mcp2515ReceiveRes.CanReceivedMsg[i].ExtendedId & 0xFF));
+      Mcp2515ReceiveRes.CanReceivedMsg[i].Extended = TRUE;
+      /* RxMnSIDH - RxMnSIDL */
+      Mcp2515_WriteRegister(RXM0SIDH, 0xFF);
+      Mcp2515_WriteRegister(RXM0SIDL, 0xE3);
+
+      Mcp2515_WriteRegister(RXM1SIDH, 0xFF);
+      Mcp2515_WriteRegister(RXM1SIDL, 0xE3);
+
+      /* RXMnEID8 - RXMnEID0 */
+      Mcp2515_WriteRegister(RXM0EID8, 0xFF);
+      Mcp2515_WriteRegister(RXM0EID0, 0xFF);
+
+      Mcp2515_WriteRegister(RXM1EID8, 0xFF);
+      Mcp2515_WriteRegister(RXM1EID0, 0xFF);
+    }
+    else
+    {
+      uint8 RXFnSIDL = (uint8)((Mcp2515ReceiveRes.CanReceivedMsg[i].StandardId<<5) & 0xFF);
+      Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+1, RXFnSIDL);
+      Mcp2515_ReadRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+1, 1);
+
+      Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+2, 0x00);
+      Mcp2515_ReadRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+1, 1);
+
+      Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+3, 0x00);
+      Mcp2515_ReadRegister(Mcp2515ReceiveRes.CanReceivedMsg[i].SpiFilterReg+1, 1);
+      /* RxMnSIDH - RxMnSIDL */
+      Mcp2515_WriteRegister(RXM0SIDH, 0xFF);
+      Mcp2515_WriteRegister(RXM0SIDL, 0xE0);
+
+      Mcp2515_WriteRegister(RXM1SIDH, 0xFF);
+      Mcp2515_WriteRegister(RXM1SIDL, 0xE0);
+
+      /* RXMnEID8 - RXMnEID0 */
+      Mcp2515_WriteRegister(RXM0EID8, 0x00);
+      Mcp2515_WriteRegister(RXM0EID0, 0x00);
+
+      Mcp2515_WriteRegister(RXM1EID8, 0x00);
+      Mcp2515_WriteRegister(RXM1EID0, 0x00);
+    }
+  }
+
+}
+
+
+void Mcp2515_SetRxMsg(uint16 StandardId, uint32 ExtendedId, boolean Extended)
+{
+  Mcp2515_BitModifyReg(CANCTRL, 0xE0, 0x80);
+  uint8 index = Mcp2515ReceiveRes.CanReceiveMsgIndex;
+  Mcp2515ReceiveRes.CanReceivedMsg[ index ].Extended = Extended;
+  Mcp2515ReceiveRes.CanReceivedMsg[ index ].ExtendedId = ExtendedId;
+  Mcp2515ReceiveRes.CanReceivedMsg[ index ].StandardId = StandardId;
+  Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[ index ].SpiFilterReg, (uint8)(Mcp2515ReceiveRes.CanReceivedMsg[ index ].StandardId>>3));
+  Mcp2515_ReadRegister(Mcp2515ReceiveRes.CanReceivedMsg[ index ].SpiFilterReg, 1);
+  if (Mcp2515ReceiveRes.CanReceivedMsg[ index ].Extended == TRUE)
+  {
+
+    uint8 RXFnSIDL = (uint8)((Mcp2515ReceiveRes.CanReceivedMsg[ index ].StandardId<<5) & 0xFF)|8|(uint8)((Mcp2515ReceiveRes.CanReceivedMsg[ index ].ExtendedId>>16) &0xFF);
+    Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[ index ].SpiFilterReg+1, RXFnSIDL);
+    Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[ index ].SpiFilterReg+2, (uint8)((Mcp2515ReceiveRes.CanReceivedMsg[ index ].ExtendedId>>8) & 0xFF));
+    Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[ index ].SpiFilterReg+3, (uint8)(Mcp2515ReceiveRes.CanReceivedMsg[ index ].ExtendedId & 0xFF));
+
+    /* RxMnSIDH - RxMnSIDL */
+    Mcp2515_WriteRegister(RXM0SIDH, 0xFF);
+    Mcp2515_WriteRegister(RXM0SIDL, 0xE3);
+
+    Mcp2515_WriteRegister(RXM1SIDH, 0xFF);
+    Mcp2515_WriteRegister(RXM1SIDL, 0xE3);
+
+    /* RXMnEID8 - RXMnEID0 */
+    Mcp2515_WriteRegister(RXM0EID8, 0xFF);
+    Mcp2515_WriteRegister(RXM0EID0, 0xFF);
+
+    Mcp2515_WriteRegister(RXM1EID8, 0xFF);
+    Mcp2515_WriteRegister(RXM1EID0, 0xFF);
+  }
+  else
+  {
+    uint8 RXFnSIDL = (uint8)((Mcp2515ReceiveRes.CanReceivedMsg[ index ].StandardId<<5) & 0xFF);
+    Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[ index ].SpiFilterReg+1, RXFnSIDL);
+    Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[ index ].SpiFilterReg+2, 0x00);
+    Mcp2515_WriteRegister(Mcp2515ReceiveRes.CanReceivedMsg[ index ].SpiFilterReg+3, 0x00);
+
+    /* RxMnSIDH - RxMnSIDL */
+    Mcp2515_WriteRegister(RXM0SIDH, 0xFF);
+    Mcp2515_WriteRegister(RXM0SIDL, 0xE0);
+
+    Mcp2515_WriteRegister(RXM1SIDH, 0xFF);
+    Mcp2515_WriteRegister(RXM1SIDL, 0xE0);
+
+    /* RXMnEID8 - RXMnEID0 */
+    Mcp2515_WriteRegister(RXM0EID8, 0x00);
+    Mcp2515_WriteRegister(RXM0EID0, 0x00);
+
+    Mcp2515_WriteRegister(RXM1EID8, 0x00);
+    Mcp2515_WriteRegister(RXM1EID0, 0x00);
+  }
+  if (Mcp2515ReceiveRes.CanReceiveMsgIndex == 5 )
+  {
+    Mcp2515ReceiveRes.CanReceiveMsgIndex = 0;
+  }
+  else
+  {
+    Mcp2515ReceiveRes.CanReceiveMsgIndex++;
+  }
+  Mcp2515_BitModifyReg(CANCTRL, 0xE0, 0x00);
+
+
+}
+
+
+static inline boolean Mcp2515_ReadRxBuf0(void)
+{
+  Mcp2515_ReadRegister(RXB0CTRL, 1);
+  uint8 BufferIndex = Mcp2515ReadBuffer[0] & 1;
+  uint8 RxSize = 0;
+
+  /* Read Number of bytes received */
+  Mcp2515_ReadRegister(RXB0DLC, 1);
+  RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
+  Mcp2515_ReadRegister(RXB0DM , RxSize);
+
+  for (uint8 i = 0; i < RxSize; i++)
+  {
+    Mcp2515ReceiveRes.CanReceivedMsg[ BufferIndex ].ReceiveMsg[ (RxSize - 1) - i ] = Mcp2515ReadBuffer[ i ];
+  }
+
+  /* Clear RXF0, RXF1 FULL INTERRUPT BIT */
+  Mcp2515_BitModifyReg(CANINTF, 0x3, 0x0);
+  return TRUE;
+
+}
+
+
+static inline boolean Mcp2515_ReadRxBuf1(void)
+{
+  Mcp2515_ReadRegister(RXB1CTRL, 1);
+  uint8 BufferIndex = 0;
+  uint8 RxSize = 0;
+  Mcp2515_ReadRegister(RXB1CTRL, 1);
+  boolean retVal;
+
+  if ((Mcp2515ReadBuffer[0] & (0x1 << 3)) == (0x1 <<3))
+  {
+    BufferIndex = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | 0x1);
+    Mcp2515_ReadRegister(RXB1DLC, 1);
+    RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
+    Mcp2515_ReadRegister(RXB1DM , RxSize);
+
+    for (uint8 i = 0; i < RxSize; i++)
+    {
+      Mcp2515ReceiveRes.CanReceivedMsg[ BufferIndex ].ReceiveMsg[ (RxSize - 1) - i ] = Mcp2515ReadBuffer[ i ];
+    }
+    /* Clear RXF0,RXF1 FULL INTERRUPT BIT */
+    Mcp2515_BitModifyReg(CANINTF, 0x3, 0x0);
+    retVal = TRUE;
+  }
+  else
+  {
+    retVal = FALSE;
+  }
+
+  return retVal;
+}
+
+
+/* Here we change one of the saved messages according to what the index shows */
+static inline boolean Mcp2515_ReadAnyMsg(void)
+{
+  boolean Ret;
+  uint16 StandardId = 0;
+  uint32 ExtendedId = 0;
+  boolean Extended = FALSE;
+  uint8  RxSize = 0;
+
+  Mcp2515_ReadRegister(CANINTF, 1);
+  if ((Mcp2515ReadBuffer[0] & 0x1) == 0x1)
+  {
+    /* Standard bits 3 - 10 */
+    Mcp2515_ReadRegister(RXB0SIDH, 1);
+    StandardId = (uint16)Mcp2515ReadBuffer[0] << 3;
+
+    /* Standard bits 0 - 2 */
+    Mcp2515_ReadRegister(RXB0SIDL, 1);
+    StandardId = StandardId | (Mcp2515ReadBuffer[0] >> 5);
+
+    if (Mcp2515ReadBuffer[0] & (0x1 << 3) == 0)
+    {
+      Extended = FALSE;
+
+      /* Read Rx size */
+      Mcp2515_ReadRegister(RXB0DLC, 1);
+      RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
+
+      /* Read Rx Buffer */
+      Mcp2515_ReadRegister(RXB0DM , RxSize);
+      for (uint8 i = 0; i < RxSize; i++)
+      {
+        Mcp2515ReceiveRes.CanReceivedMsg[ Mcp2515ReceiveRes.CanReceiveMsgIndex ].ReceiveMsg[ i ] = Mcp2515ReadBuffer[ i ];
+      }
+      /* Clear RXF0,RXF1 FULL INTERRUPT BIT */
+      Mcp2515_WriteRegister(CANINTF, 0x0);
+
+      /* Update Array with new message */
+      Mcp2515_SetRxMsg(StandardId, ExtendedId, Extended);
+      Ret = TRUE;
+
+    }
+    else
+    {
+      Extended = FALSE;
+      /* Extended bits  16 - 17 */
+      ExtendedId = (uint32)(Mcp2515ReadBuffer[0] & 0x3) << 16;
+
+      /* Extended bits  8 - 15 */
+      Mcp2515_ReadRegister(RXB0EID8, 1);
+      ExtendedId = ExtendedId | ((uint32)Mcp2515ReadBuffer[0] << 8);
+
+      /* Extended bits  0 - 8 */
+      Mcp2515_ReadRegister(RXB0EID0, 1);
+      ExtendedId = ExtendedId | Mcp2515ReadBuffer[0];
+
+      /* Read Rx Size */
+      Mcp2515_ReadRegister(RXB0DLC, 1);
+      RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
+
+      /* Read Rx buffer */
+      Mcp2515_ReadRegister(RXB0DM , RxSize);
+
+
+      for (uint8 i = 0; i < RxSize; i++)
+      {
+        Mcp2515ReceiveRes.CanReceivedMsg[ Mcp2515ReceiveRes.CanReceiveMsgIndex ].ReceiveMsg[ i ] = Mcp2515ReadBuffer[ i ];
+      }
+      /* Clear RXF0,RXF1 FULL INTERRUPT BIT */
+      Mcp2515_WriteRegister(CANINTF, 0x0);
+
+      /* Update with the new message */
+      Mcp2515_SetRxMsg(StandardId, ExtendedId, Extended);
+      Ret = TRUE;
+    }
+  }
+  else if ((Mcp2515ReadBuffer[0] & 0x2) == 0x2)
+  {
+    /* Standard Bits 3 - 10 */
+    Mcp2515_ReadRegister(RXB1SIDH, 1);
+    StandardId = (uint16)Mcp2515ReadBuffer[0] << 3;
+
+    /* Standard Bits 0 - 2 */
+    Mcp2515_ReadRegister(RXB1SIDL, 1);
+    StandardId = StandardId | (Mcp2515ReadBuffer[0] >> 5);
+
+    if (Mcp2515ReadBuffer[0] & (0x1 << 3) == 0)
+    {
+      Extended = FALSE;
+
+      /* Read Rx Size */
+      Mcp2515_ReadRegister(RXB1DLC, 1);
+      RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
+
+      /* Read RxBuffer */
+      Mcp2515_ReadRegister(RXB1DM , RxSize);
+
+
+      for (uint8 i = 0; i < RxSize; i++)
+      {
+        Mcp2515ReceiveRes.CanReceivedMsg[ Mcp2515ReceiveRes.CanReceiveMsgIndex ].ReceiveMsg[ i ] = Mcp2515ReadBuffer[ i ];
+      }
+      /* Clear RXF0,RXF1 FULL INTERRUPT BIT */
+      Mcp2515_WriteRegister(CANINTF, 0x0);
+
+      /* Update the array with new message configuration */
+      Mcp2515_SetRxMsg(StandardId, ExtendedId, Extended);
+      Ret = TRUE;
+    }
+    else
+    {
+      Extended = FALSE;
+      /* Extended bits  16 - 17 */
+      ExtendedId = (uint32)(Mcp2515ReadBuffer[0] & 0x3) << 16;
+
+      /* Extended bits 8 - 15 */
+      Mcp2515_ReadRegister(RXB1EID8, 1);
+      ExtendedId = ExtendedId | ((uint32)Mcp2515ReadBuffer[0] << 8);
+
+      /* Extended bits 0 - 7 */
+      Mcp2515_ReadRegister(RXB1EID0, 1);
+      ExtendedId = ExtendedId | Mcp2515ReadBuffer[0];
+
+      /* Get RxBuffer number of bytes */
+      Mcp2515_ReadRegister(RXB1DLC, 1);
+      RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
+
+      /* Read RxBuffer */
+      Mcp2515_ReadRegister(RXB1DM , RxSize);
+
+
+      for (uint8 i = 0; i < RxSize; i++)
+      {
+        Mcp2515ReceiveRes.CanReceivedMsg[ Mcp2515ReceiveRes.CanReceiveMsgIndex ].ReceiveMsg[ i ] = Mcp2515ReadBuffer[ i ];
+      }
+      /* Clear RXF0,RXF1 FULL INTERRUPT BIT */
+      Mcp2515_WriteRegister(CANINTF, 0x0);
+
+      /* Update the new received Messsage */
+      Mcp2515_SetRxMsg(StandardId, ExtendedId, Extended);
+      Ret = TRUE;
+    }
+  }
+  else
+  {
+    /* This should not be reached */
+    Ret = FALSE;
+  }
+  return Ret;
+}
+
+
+boolean Mcp2515_ReadRxMsg(void)
+{
+  boolean retVal;
+  if ((Mcp2515ReceiveRes.CanReceiveMode != 0) && (Mcp2515ReceiveRes.CanReceiveMode != 3))
+  {
+    Mcp2515_ReadRegister(CANINTF, 1);
+    if (((Mcp2515ReadBuffer[0] & 0x1) == 0x1) && ((Mcp2515ReadBuffer[0] & 0x2) == 0x0))
+    {
+      retVal = Mcp2515_ReadRxBuf0();
+    }
+    else if ((Mcp2515ReadBuffer[0] & 0x2) == 0x2)
+    {
+      retVal =  Mcp2515_ReadRxBuf1();
+    }
+    else
+    {
+      retVal = FALSE;
+
+    }
+  }
+  else
+  {
+    retVal =  Mcp2515_ReadAnyMsg();
+  }
+  return retVal;
+}
+
+
+void Mcp2515_ChangeRxMod(MCP2515_RECEIVE_MODE mode)
+{
+  Mcp2515ReceiveRes.CanReceiveMode = mode;
+  /* Set up the receive mode to be standard by default */
+  Mcp2515_BitModifyReg(RXB0CTRL, 0x64, Mcp2515ReceiveRes.CanReceiveMode<<5 | 0x4);
+  Mcp2515_BitModifyReg(RXB1CTRL, 0x64, Mcp2515ReceiveRes.CanReceiveMode<<5 | 0x4);
 }

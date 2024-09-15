@@ -51,6 +51,31 @@
   KBPS_500,
   KBPS_1000
 }MCP2515_BAUDRATE;
+
+typedef enum
+{
+  ALL_MESSAGES_MODE,
+  STANDARD_IDS_MODE,
+  EXTENDED_IDS_MODE,
+  OFF_MASK
+}MCP2515_RECEIVE_MODE;
+
+typedef struct
+{
+    uint32  ExtendedId;
+    uint16  StandardId;
+    boolean Extended;
+    uint8*  ReceiveMsg;
+    uint8   SpiFilterReg;
+}MCP2515_MESSAGE;
+
+typedef struct
+{
+    MCP2515_RECEIVE_MODE CanReceiveMode;
+    MCP2515_MESSAGE*     CanReceivedMsg;
+    uint8                CanReceiveMsgSize;
+    uint8                CanReceiveMsgIndex;
+}MCP2515_RECEIVE_RES;
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -62,9 +87,12 @@
  void SpimasterRxMcp2515(void );
  void SpimasterErMcp2515(void);
 void Mcp2515_Init(void);
+void Mcp2515_ChangeRxMod(MCP2515_RECEIVE_MODE mode);
 void Mcp2515_SetBaudrate(MCP2515_BAUDRATE Baudrate);
 boolean Mcp2515_SetRegNum(uint8 Num);
 void Mcp2515_SetTransmitMsgId(uint16 CanId, boolean extIdentifier, uint32 Identifier);
 boolean Mcp2515_Transmit(uint8* CanMsg, uint8 CanMsgSize);
+void Mcp2515_SetRxMsg(uint16 StandardId, uint32 ExtendedId, boolean Extended);
+boolean Mcp2515_ReadRxMsg(void);
 
 #endif /* INFINEONARDUINOLIKE_MCP2515_H_ */

@@ -114,7 +114,7 @@ void Can_InitNode0(void)
     IfxMultican_Can_initModule(&MultiCanNode0.can, &MultiCanNode0.canConfig);
 
     setPinOutput(&MODULE_P20, 6);
-    setPinOutput(&MODULE_P00,5);
+    setPinOutput(&MODULE_P00, 5);
 
     /* ==========================================================================================
      * Source CAN node configuration and initialization:
@@ -140,18 +140,34 @@ void Can_InitNode0(void)
 }
 
 
-void Can_InitTransmitMsgObj(uint32 CanId)
+void Can_InitTransmitMsgObj(uint32 CanId, uint32 ExtendedId , uint8 CanDataLength, boolean extended )
 {
+  if (CanDataLength > 8)
+  {
+    CanDataLength  = 8;
+  }
+
+
   IfxMultican_Can_MsgObj_initConfig(&MultiCanNode0.canMsgObjConfig, &MultiCanNode0.canSrcNode);
 
   MultiCanNode0.canMsgObjConfig.msgObjId = SRC_MESSAGE_OBJECT_ID;
-  MultiCanNode0.canMsgObjConfig.messageId = CanId;
+  if (extended == TRUE)
+  {
+    MultiCanNode0.canMsgObjConfig.messageId = (CanId << 18) | ExtendedId;
+    MultiCanNode0.canMsgObjConfig.control.extendedFrame = 1;
+    MultiCanNode0.canMsgObjConfig.acceptanceMask = 0x7FFFFFFFUL;
+  }
+  else
+  {
+    MultiCanNode0.canMsgObjConfig.messageId = CanId;
+    MultiCanNode0.canMsgObjConfig.control.extendedFrame = 0;
+    MultiCanNode0.canMsgObjConfig.acceptanceMask = 0x7FF;
+  }
+
   MultiCanNode0.canMsgObjConfig.frame = IfxMultican_Frame_transmit;
   MultiCanNode0.canMsgObjConfig.node = &MultiCanNode0.canSrcNode;
   MultiCanNode0.canMsgObjConfig.msgObjCount = 1;
-  MultiCanNode0.canMsgObjConfig.control.messageLen = IfxMultican_DataLengthCode_8;
-  MultiCanNode0.canMsgObjConfig.acceptanceMask = 0xFF;
-  MultiCanNode0.canMsgObjConfig.control.extendedFrame = FALSE;
+  MultiCanNode0.canMsgObjConfig.control.messageLen = CanDataLength;
   MultiCanNode0.canMsgObjConfig.control.matchingId = TRUE;
 
   IfxMultican_Can_MsgObj_init(&MultiCanNode0.canSrcMsgObj, &MultiCanNode0.canMsgObjConfig);
@@ -185,20 +201,53 @@ void Can_InitReceiveMsgObj(uint32 CanId)
 /* Function to initialize both TX and RX messages with the default data values.
  * After initialization of the messages, the TX message will be transmitted.
  */
-void transmitCanMessage(uint32 dataLow, uint32 dataHigh)
+void Can_TransmitMsg(uint8* Msg, uint8 size)
 {
-    togglePinOutput(&MODULE_P00,5);
-    /* Initialization of the TX message */
-    IfxMultican_Message_init(&MultiCanNode0.txMsg,
-                             MultiCanNode0.canMsgObjConfig.messageId,
-                             dataLow,
-                             dataHigh,
-                             MultiCanNode0.canMsgObjConfig.control.messageLen);
+  uint32 dataLow = 0;
+  uint32 dataHigh = 0;
+  uint8 CanDataCounter = 0;
+  boolean ParseLow = FALSE;
+  if (size > 4)
+  {
+    CanDataCounter = (size -1) - 4;
+  }
+  else
+  {
+    CanDataCounter = (size - 1);
+    ParseLow = TRUE;
+  }
 
-    /* Send the CAN message with the previously defined TX message content */
-
-    while (  IfxMultican_Status_notSentBusy ==  IfxMultican_Can_MsgObj_sendMessage(&MultiCanNode0.canSrcMsgObj, &MultiCanNode0.txMsg) )
+  for (uint8 i = 0; i < size; i++)
+  {
+    if (ParseLow == TRUE)
     {
-
+      dataLow = dataLow | ((uint32)Msg[i] << (CanDataCounter*8));
     }
+    else
+    {
+      dataHigh = dataHigh | ((uint32)Msg[i] << (CanDataCounter*8));
+    }
+    if (CanDataCounter == 0)
+    {
+      CanDataCounter = 3;
+      ParseLow = TRUE;
+    }
+    else
+    {
+      CanDataCounter -= 1;
+    }
+  }
+  /* Initialization of the TX message */
+  IfxMultican_Message_init(&MultiCanNode0.txMsg,
+                           MultiCanNode0.canMsgObjConfig.messageId,
+                           dataLow,
+                           dataHigh,
+                           MultiCanNode0.canMsgObjConfig.control.messageLen);
+
+  /* Send the CAN message with the previously defined TX message content */
+
+  while (  IfxMultican_Status_notSentBusy ==  IfxMultican_Can_MsgObj_sendMessage(&MultiCanNode0.canSrcMsgObj, &MultiCanNode0.txMsg) )
+  {
+
+  }
 }
