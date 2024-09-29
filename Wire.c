@@ -93,7 +93,7 @@ void I2c_ReadRegister(IfxI2c_I2c_Device* myi2cdev,uint8 registerAddress, Ifx_Siz
 {
 
     // Send the register address to the device
-    while (IfxI2c_I2c_write(myi2cdev, &registerAddress, 0) == IfxI2c_I2c_Status_nak);
+    while (IfxI2c_I2c_write(myi2cdev, &registerAddress, 1) == IfxI2c_I2c_Status_nak);
 
     // Read the data from the device
     while (IfxI2c_I2c_read(myi2cdev, myRxTxBuffer, size) == IfxI2c_I2c_Status_nak);

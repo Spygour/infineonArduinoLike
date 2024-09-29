@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file DsAdc.c
+ * \file HySrf05.c
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -29,20 +29,23 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "DsAdc.h"
+#include "HySrf05.h"
+#include "INTERRUPTS.h"
+#include "pinsReadWrite.h"
+#include "Bsp.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-
+/* Echo is the 00.11
+ * Trigger is the 00.7
+ */
+#define ECHO_PIN &MODULE_P00,11
+#define TRIGGER_PIN &MODULE_P00,7
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
-uint8 dsadcChannelAvailable[IFXDSADC_NUM_CHANNELS] = { 1, 1, 1, 1, 1, 1 };
-IfxDsadc_Dsadc_Channel DsAdcChannels[IFXDSADC_NUM_CHANNELS];
-sint16 DsAdcResult[IFXDSADC_NUM_CHANNELS];
-float32 DsAdcResultVoltage [IFXDSADC_NUM_CHANNELS];
-float32 DsAdcSupplyVoltage = 3.3;
-float32 DsAdcmaxValue = 21613.0;
+Ifx_TickTime HySrfDelay;
+float HySrf05Distance = 0;
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -54,56 +57,31 @@ float32 DsAdcmaxValue = 21613.0;
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
-void DsAdc_Init(IfxDsadc_Dsadc *DsAdc, IfxDsadc_ChannelId* DsAdcChannelsId, uint8 channelsNum)
+
+
+void HySrf05_init(void)
 {
-  if (channelsNum > 6)
-  {
-    channelsNum = 6;
-  }
-  else
-  {
-
-  }
-  IfxDsadc_Dsadc_Config dsadcConfig;
-
-  IfxDsadc_Dsadc_initModuleConfig(&dsadcConfig, &MODULE_DSADC);
-  IfxDsadc_Dsadc_initModule(DsAdc, &dsadcConfig);
-
-  // create channel config
-  IfxDsadc_Dsadc_ChannelConfig dsadcChannelConfig;
-  IfxDsadc_Dsadc_initChannelConfig(&dsadcChannelConfig, DsAdc);
-
-  /* Modify default configuration of the channel */
-  dsadcChannelConfig.demodulator.inputDataSource = IfxDsadc_InputDataSource_directInputA;
-  dsadcChannelConfig.demodulator.sampleStrobe = IfxDsadc_SampleStrobe_sampleOnBothEdges;
-  dsadcChannelConfig.combFilter.decimationFactor  = 32;
-  dsadcChannelConfig.combFilter.startValue = 32;
-  dsadcChannelConfig.combFilter.combFilterShift = IfxDsadc_MainCombFilterShift_shiftBy3,
-  dsadcChannelConfig.firFilter.fir0Enabled = TRUE;
-  dsadcChannelConfig.firFilter.fir1Enabled = TRUE;
-  dsadcChannelConfig.firFilter.dataShift = IfxDsadc_FirDataShift_shiftBy1;
-
-  // initialize channels
-  for(int chn = 0; chn < channelsNum; ++chn) {
-      if( dsadcChannelAvailable[chn] )
-      {
-          dsadcChannelConfig.channelId = DsAdcChannelsId[chn];
-
-          IfxDsadc_Dsadc_initChannel(&DsAdcChannels[chn], &dsadcChannelConfig);
-      }
-  }
-  IfxDsadc_Dsadc_startScan(DsAdc, 0x3f, 0x3f);
-
+  HySrfDelay = IfxStm_getTicksFromMicroseconds(BSP_DEFAULT_TIMER, 10);
+  setPinInputNoPull(ECHO_PIN);
+  IfxPort_setPinPadDriver(ECHO_PIN, IfxPort_PadDriver_cmosAutomotiveSpeed2);
+  setPinOutput(TRIGGER_PIN);
+  IfxPort_setPinPadDriver(TRIGGER_PIN, IfxPort_PadDriver_cmosAutomotiveSpeed2);
+  setPinOutputFalse(TRIGGER_PIN);
 }
 
-void DsAdc_Read(IfxDsadc_Dsadc *DsAdc, uint8 channelsNum)
+void HySrf05_captureDistance(void)
 {
-  for(int chn = 0; chn < channelsNum; ++chn)
-  {
-      if( dsadcChannelAvailable[chn] )
-      {
-        DsAdcResult[chn] = IfxDsadc_Dsadc_getMainResult(&DsAdcChannels[chn]);
-        DsAdcResultVoltage[chn] = ((float32)DsAdcResult[chn] * DsAdcSupplyVoltage)/ DsAdcmaxValue;
-      }
-  }
+  setPinOutputTrue(TRIGGER_PIN);
+  wait(HySrfDelay);
+  setPinOutputFalse(TRIGGER_PIN);
+  static uint64 echoTicks = 0;
+  static float echo = 0;
+  while (getPinState(ECHO_PIN) == FALSE){}
+  echoTicks = IfxStm_get(&MODULE_STM0);
+  while (getPinState(ECHO_PIN) == TRUE) {}
+  echoTicks = IfxStm_get(&MODULE_STM0) - echoTicks;
+  echo = (float)(echoTicks/100000000);
+
+  /* Distance = 100*period*speed_of_light/2  cm */
+  HySrf05Distance = (100*(float)echo*343)/2;
 }

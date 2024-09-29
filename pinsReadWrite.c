@@ -56,7 +56,11 @@ void togglePinOutput(Ifx_P *port, uint8 pinIndex){
     IfxPort_togglePin(port,pinIndex);
 }
 void setPinOutputFalse(Ifx_P *port, uint8 pinIndex){
-    IfxPort_setPinLow(port,pinIndex);
+  IfxPort_setPinLow(port,pinIndex);
+}
+
+void setPinInputNoPull(Ifx_P *port, uint8 pinIndex){
+  IfxPort_setPinModeInput(port,pinIndex, IfxPort_Mode_inputNoPullDevice);
 }
 
 void setPinInputPullup(Ifx_P *port, uint8 pinIndex){

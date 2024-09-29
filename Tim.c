@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file DsAdc.c
+ * \file Tim.c
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -29,7 +29,9 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "DsAdc.h"
+#include "Tim.h"
+#include "PWM_GENERATOR.h"
+#include "INTERRUPTS.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -37,12 +39,8 @@
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
-uint8 dsadcChannelAvailable[IFXDSADC_NUM_CHANNELS] = { 1, 1, 1, 1, 1, 1 };
-IfxDsadc_Dsadc_Channel DsAdcChannels[IFXDSADC_NUM_CHANNELS];
-sint16 DsAdcResult[IFXDSADC_NUM_CHANNELS];
-float32 DsAdcResultVoltage [IFXDSADC_NUM_CHANNELS];
-float32 DsAdcSupplyVoltage = 3.3;
-float32 DsAdcmaxValue = 21613.0;
+float TimPeriod = 0.0;
+sint32 TimDutyCycle = 0.0;
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -54,56 +52,41 @@ float32 DsAdcmaxValue = 21613.0;
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
-void DsAdc_Init(IfxDsadc_Dsadc *DsAdc, IfxDsadc_ChannelId* DsAdcChannelsId, uint8 channelsNum)
+void Tim_Init(IfxGtm_Tim_In* TimDriver, Tim_Pin* pin)
 {
-  if (channelsNum > 6)
+  if (GtmModuleInit == FALSE)
   {
-    channelsNum = 6;
+    IfxGtm_enable(&MODULE_GTM);                                         /* Enable the GTM                           */
+
+    GtmModuleInit = TRUE;
   }
-  else
+  if (CmuClkEn == FALSE)
   {
-
+    IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_CLK0);        /* Enable the CMU clock 0                   */
+    CmuClkEn = TRUE;
   }
-  IfxDsadc_Dsadc_Config dsadcConfig;
+  IfxGtm_Tim_In_Config configTIM;
 
-  IfxDsadc_Dsadc_initModuleConfig(&dsadcConfig, &MODULE_DSADC);
-  IfxDsadc_Dsadc_initModule(DsAdc, &dsadcConfig);
-
-  // create channel config
-  IfxDsadc_Dsadc_ChannelConfig dsadcChannelConfig;
-  IfxDsadc_Dsadc_initChannelConfig(&dsadcChannelConfig, DsAdc);
-
-  /* Modify default configuration of the channel */
-  dsadcChannelConfig.demodulator.inputDataSource = IfxDsadc_InputDataSource_directInputA;
-  dsadcChannelConfig.demodulator.sampleStrobe = IfxDsadc_SampleStrobe_sampleOnBothEdges;
-  dsadcChannelConfig.combFilter.decimationFactor  = 32;
-  dsadcChannelConfig.combFilter.startValue = 32;
-  dsadcChannelConfig.combFilter.combFilterShift = IfxDsadc_MainCombFilterShift_shiftBy3,
-  dsadcChannelConfig.firFilter.fir0Enabled = TRUE;
-  dsadcChannelConfig.firFilter.fir1Enabled = TRUE;
-  dsadcChannelConfig.firFilter.dataShift = IfxDsadc_FirDataShift_shiftBy1;
-
-  // initialize channels
-  for(int chn = 0; chn < channelsNum; ++chn) {
-      if( dsadcChannelAvailable[chn] )
-      {
-          dsadcChannelConfig.channelId = DsAdcChannelsId[chn];
-
-          IfxDsadc_Dsadc_initChannel(&DsAdcChannels[chn], &dsadcChannelConfig);
-      }
-  }
-  IfxDsadc_Dsadc_startScan(DsAdc, 0x3f, 0x3f);
+  IfxGtm_Tim_In_initConfig(&configTIM, &MODULE_GTM);                  /* Initialize default parameters            */
+  configTIM.filter.irqOnGlitch = FALSE;
+  configTIM.timIndex = pin->tim;
+  configTIM.channelIndex = pin->channel;
+  configTIM.filter.inputPin = pin;                                /* Select input port pin                    */
+  configTIM.filter.inputPinMode = IfxPort_InputMode_noPullDevice;         /* Select input port pin mode               */
+  IfxGtm_Tim_In_init(TimDriver, &configTIM);                       /* Initialize the TIM                       */
 
 }
 
-void DsAdc_Read(IfxDsadc_Dsadc *DsAdc, uint8 channelsNum)
+float Tim_GetPeriod(IfxGtm_Tim_In* TimDriver)
 {
-  for(int chn = 0; chn < channelsNum; ++chn)
-  {
-      if( dsadcChannelAvailable[chn] )
-      {
-        DsAdcResult[chn] = IfxDsadc_Dsadc_getMainResult(&DsAdcChannels[chn]);
-        DsAdcResultVoltage[chn] = ((float32)DsAdcResult[chn] * DsAdcSupplyVoltage)/ DsAdcmaxValue;
-      }
-  }
+  IfxGtm_Tim_In_update(TimDriver);                                    /* Update the measured data         */
+  TimPeriod = IfxGtm_Tim_In_getPeriodSecond(TimDriver);
+  return TimPeriod;
+}
+
+sint32 Tim_GetDuty(IfxGtm_Tim_In* TimDriver)
+{
+  IfxGtm_Tim_In_update(TimDriver);                                    /* Update the measured data         */
+  TimDutyCycle = IfxGtm_Tim_In_getPulseLengthTick(TimDriver);
+  return TimDutyCycle;
 }

@@ -31,6 +31,7 @@
 /*********************************************************************************************************************/
 
 #include "INTERRUPTS.h"
+#include "PWM_GENERATOR.h"
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -46,8 +47,7 @@ IfxGtm_Tom_Timer myTestExample;
 IfxGtm_Tom_Timer_Config tomConfig;
 IfxGtm_Tom_Timer_Config tomPwmTimerConfig;
 IfxGtm_Atom_Timer_Config atomConfig;
-
-static boolean TomTimerInit = FALSE;
+boolean        CmuClkEn = FALSE;
 static boolean AtomTimerInit = FALSE;
 /*********************************************************************************************************************/
 /*********************************************************************************************************************/
@@ -167,11 +167,15 @@ void test_function(){
 
 void TomInterrupt_Init(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,uint16 tom,uint16 channel, uint16 clock)
 {
-  if (TomTimerInit == FALSE)
+  if (GtmModuleInit == FALSE)
   {
     IfxGtm_enable(&MODULE_GTM);                                                  /* Enable GTM */
+    GtmModuleInit = TRUE;
+  }
+  if (CmuClkEn == FALSE)
+  {
     IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);               /* Enable the CMU clock */
-    TomTimerInit = TRUE;
+    CmuClkEn = TRUE;
   }
 
   setTomConfig(freq,priority,tom,channel, clock,&MODULE_GTM); /*Set the values to tom config*/
@@ -183,17 +187,20 @@ void TomInterrupt_Init(IfxGtm_Tom_Timer *mytomtimer,float freq,uint16 priority,u
 
 void TomPwmTimer_Init(IfxGtm_Tom_Timer *mytomtimer,uint32 Period,uint16 DutyCycle,IfxGtm_Tom_ToutMap* pin)
 {
-  if (TomTimerInit == FALSE)
+  if (GtmModuleInit == FALSE)
   {
-    IfxGtm_enable(&MODULE_GTM);
-    /* Set the GTM global clock frequency in Hz */
-    IfxGtm_Cmu_setGclkFrequency(&MODULE_GTM, IfxGtm_Cmu_getModuleFrequency(&MODULE_GTM));
-    /* Set the GTM configurable clock frequency in Hz */
-    IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_0, IfxGtm_Cmu_getGclkFrequency(&MODULE_GTM));
-    /* Enable the FXU clock                         */
-    IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);
-    TomTimerInit = TRUE;
+    IfxGtm_enable(&MODULE_GTM);                                                  /* Enable GTM */
+    GtmModuleInit = TRUE;
   }
+  IfxGtm_Cmu_setGclkFrequency(&MODULE_GTM, IfxGtm_Cmu_getModuleFrequency(&MODULE_GTM));
+  /* Enable the FXU clock                         */
+  if (CmuClkEn == FALSE)
+  {
+    IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_0, IfxGtm_Cmu_getGclkFrequency(&MODULE_GTM));
+    IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);               /* Enable the CMU clock */
+    CmuClkEn = TRUE;
+  }
+
   setTomPwm(pin,&MODULE_GTM); /*Set pwm the values to tom config*/
 
   setTomPwmDriver(mytomtimer);                  /* Initialize the TOM               */

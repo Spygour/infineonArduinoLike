@@ -37,7 +37,6 @@
 #define lo8(x) ((x)&0xff)
 #define hi8(x) ((x)>>8)
 
-#define F_CPU 100000000
 #define RH_DRAM_ATTR
 // This is the value of the start symbol after 6-bit conversion and nybble swapping
 #define RH_ASK_START_SYMBOL 0xb38
@@ -260,7 +259,7 @@ uint8 timerCalc(float32 speed,uint16 max_ticks, float32 *nticks){
         // Integer arithmetic courtesy Jim Remington
         // 1/Amount of time per CPU clock tick (in seconds)
         prescalerValue = prescalers[prescaler];
-            unsigned long inv_clock_time = F_CPU / ((unsigned long)prescalerValue);
+            unsigned long inv_clock_time = IfxStm_getFrequency(&MODULE_STM0) / ((unsigned long)prescalerValue);
             // number of prescaled ticks needed to handle bit time @ speed
             ulticks = inv_clock_time / inv_bit_time;
 

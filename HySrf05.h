@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file DsAdc.c
+ * \file HySrf05.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -25,11 +25,13 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
+#ifndef INFINEONARDUINOLIKE_HYSRF05_H_
+#define INFINEONARDUINOLIKE_HYSRF05_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "DsAdc.h"
+#include "Ifx_Types.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -37,12 +39,11 @@
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
-uint8 dsadcChannelAvailable[IFXDSADC_NUM_CHANNELS] = { 1, 1, 1, 1, 1, 1 };
-IfxDsadc_Dsadc_Channel DsAdcChannels[IFXDSADC_NUM_CHANNELS];
-sint16 DsAdcResult[IFXDSADC_NUM_CHANNELS];
-float32 DsAdcResultVoltage [IFXDSADC_NUM_CHANNELS];
-float32 DsAdcSupplyVoltage = 3.3;
-float32 DsAdcmaxValue = 21613.0;
+
+/*********************************************************************************************************************/
+/*-------------------------------------------------Data Structures---------------------------------------------------*/
+/*********************************************************************************************************************/
+ 
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -50,60 +51,7 @@ float32 DsAdcmaxValue = 21613.0;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
+void HySrf05_init(void);
+void HySrf05_captureDistance(void);
 
-/*********************************************************************************************************************/
-/*---------------------------------------------Function Implementations----------------------------------------------*/
-/*********************************************************************************************************************/
-void DsAdc_Init(IfxDsadc_Dsadc *DsAdc, IfxDsadc_ChannelId* DsAdcChannelsId, uint8 channelsNum)
-{
-  if (channelsNum > 6)
-  {
-    channelsNum = 6;
-  }
-  else
-  {
-
-  }
-  IfxDsadc_Dsadc_Config dsadcConfig;
-
-  IfxDsadc_Dsadc_initModuleConfig(&dsadcConfig, &MODULE_DSADC);
-  IfxDsadc_Dsadc_initModule(DsAdc, &dsadcConfig);
-
-  // create channel config
-  IfxDsadc_Dsadc_ChannelConfig dsadcChannelConfig;
-  IfxDsadc_Dsadc_initChannelConfig(&dsadcChannelConfig, DsAdc);
-
-  /* Modify default configuration of the channel */
-  dsadcChannelConfig.demodulator.inputDataSource = IfxDsadc_InputDataSource_directInputA;
-  dsadcChannelConfig.demodulator.sampleStrobe = IfxDsadc_SampleStrobe_sampleOnBothEdges;
-  dsadcChannelConfig.combFilter.decimationFactor  = 32;
-  dsadcChannelConfig.combFilter.startValue = 32;
-  dsadcChannelConfig.combFilter.combFilterShift = IfxDsadc_MainCombFilterShift_shiftBy3,
-  dsadcChannelConfig.firFilter.fir0Enabled = TRUE;
-  dsadcChannelConfig.firFilter.fir1Enabled = TRUE;
-  dsadcChannelConfig.firFilter.dataShift = IfxDsadc_FirDataShift_shiftBy1;
-
-  // initialize channels
-  for(int chn = 0; chn < channelsNum; ++chn) {
-      if( dsadcChannelAvailable[chn] )
-      {
-          dsadcChannelConfig.channelId = DsAdcChannelsId[chn];
-
-          IfxDsadc_Dsadc_initChannel(&DsAdcChannels[chn], &dsadcChannelConfig);
-      }
-  }
-  IfxDsadc_Dsadc_startScan(DsAdc, 0x3f, 0x3f);
-
-}
-
-void DsAdc_Read(IfxDsadc_Dsadc *DsAdc, uint8 channelsNum)
-{
-  for(int chn = 0; chn < channelsNum; ++chn)
-  {
-      if( dsadcChannelAvailable[chn] )
-      {
-        DsAdcResult[chn] = IfxDsadc_Dsadc_getMainResult(&DsAdcChannels[chn]);
-        DsAdcResultVoltage[chn] = ((float32)DsAdcResult[chn] * DsAdcSupplyVoltage)/ DsAdcmaxValue;
-      }
-  }
-}
+#endif /* INFINEONARDUINOLIKE_HYSRF05_H_ */

@@ -30,7 +30,6 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "PWM_GENERATOR.h"
-#include "math.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -47,8 +46,7 @@
 /*********************************************************************************************************************/
 IfxGtm_Tom_Pwm_Config tomPwmConfig;
 IfxGtm_Atom_Pwm_Config atomPwmConfig;
-boolean TomModuleInit = FALSE;
-boolean AtomModuleInit = FALSE;
+boolean GtmModuleInit = FALSE;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -78,6 +76,8 @@ static inline void initTomPwmConfig(uint16 period,uint16 dutyCycle,uint16 clock,
     tomPwmConfig.pin.padDriver            = IfxPort_PadDriver_cmosAutomotiveSpeed1;
 }
 
+
+
 static inline void initAtomPwmConfig(uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin,Ifx_GTM *gtm)
 {
     atomPwmConfig.gtm                      = gtm;
@@ -106,6 +106,7 @@ static inline void initTomPwmDriver(IfxGtm_Tom_Pwm_Driver *Tomdriver)
     IfxGtm_Tom_Pwm_start(Tomdriver, TRUE);                         /* Start the PWM                            */
 }
 
+
 static inline void initAtomPwmDriver(IfxGtm_Atom_Pwm_Driver *Atomdriver)
 {
     IfxGtm_Atom_Pwm_init(Atomdriver, &atomPwmConfig);                 /* Initialize the PWM                       */
@@ -115,31 +116,30 @@ static inline void initAtomPwmDriver(IfxGtm_Atom_Pwm_Driver *Atomdriver)
 
 
 /* This function initializes the TOM */
-void TomPwm_Init(IfxGtm_Tom_Pwm_Driver* mytomdriver,uint16 period,uint16 dutyCycle,uint16 clock,IfxGtm_Tom_ToutMap* pin)
+void TomPwm_Init(IfxGtm_Tom_Pwm_Driver* mytomdriver, uint16 period, uint16 dutyCycle, uint16 clock, IfxGtm_Tom_ToutMap* pin)
 {
-  if (TomModuleInit == FALSE)
+  if (GtmModuleInit == FALSE )
   {
     IfxGtm_enable(&MODULE_GTM);                                     /* Enable GTM                                   */
 
-    IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);   /* Enable the FXU clock                         */
-    TomModuleInit = TRUE;
+    GtmModuleInit = TRUE;
   }
+  IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_FXCLK);   /* Enable the FXU clock                         */
   /* Initialize the configuration structure with default parameters */
   initTomPwmConfig(period,dutyCycle,clock,pin,&MODULE_GTM);
   initTomPwmDriver(mytomdriver);            /* Initialize the PWM                       */
 }
 
+
 void AtomPwm_Init(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 period,uint16 dutyCycle,IfxGtm_Atom_ToutMap* pin)
 {
-  if (AtomModuleInit == FALSE)
+
+  if (GtmModuleInit == FALSE)
   {
-    IfxGtm_enable(&MODULE_GTM); /* Enable GTM */
-
-    IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_5, CLK_FREQ);        /* Set the CMU clock 0 frequency    */
-    IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_CLK0);                /* Enable the CMU clock 0           */
-    AtomModuleInit = TRUE;
+    GtmModuleInit = TRUE;
   }
-
+  IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, IfxGtm_Cmu_Clk_5, CLK_FREQ);        /* Set the CMU clock 0 frequency    */
+  IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_CLK0);                /* Enable the CMU clock 0           */
   initAtomPwmConfig(period,dutyCycle,pin,&MODULE_GTM);
 
   initAtomPwmDriver(myatomdriver);            /* Initialize the PWM                       */
@@ -187,6 +187,3 @@ void AtomPwm_SetClock(IfxGtm_Atom_Pwm_Driver* myatomdriver,uint16 clock)
     IfxGtm_Atom_Ch_setClockSource(myatomdriver->atom, myatomdriver->atomChannel, clock);
     IfxGtm_Atom_Agc_enableChannelUpdate(myatomdriver->agc,myatomdriver->atomChannel,1);
 }
-
-
-

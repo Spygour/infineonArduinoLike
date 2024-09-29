@@ -37,6 +37,7 @@
 void setPinOutput(Ifx_P *port, uint8 pinIndex);
 void setPinOutputTrue(Ifx_P *port, uint8 pinIndex);
 void setPinOutputFalse(Ifx_P *port, uint8 pinIndex);
+void setPinInputNoPull(Ifx_P *port, uint8 pinIndex);
 void setPinInputPullup(Ifx_P *port, uint8 pinIndex);
 void setPinInputPuldown(Ifx_P *port, uint8 pinIndex);
 boolean getPinState(Ifx_P *port, uint8 pinIndex);
