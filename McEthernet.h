@@ -69,7 +69,7 @@ typedef struct
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
 void McEthernet_SetMacAddress(uint8* MacAddress);
-void McEthernet_Init(uint8* MacAddress, uint16 maxFrazeSize);
+void McEthernet_Init(uint8* MacAddress);
 void McEthernet_WriteMsg(uint8* DstMacAddress, uint8* Type, uint8* Message, uint8 MessageSize);
 void McEthernet_ReadMsg(float32 time);
 void McEthernet_ReadMsgInf(void);

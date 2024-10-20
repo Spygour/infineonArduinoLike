@@ -35,6 +35,7 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
+#define MC_ETHERNET_MAXFRAME     1500
 #define MC_ETHERNET_RESET        &MODULE_P33,10
 #define MC_ETHERNET_SPIBAUDRATE  10000000
 #define MC_ETHERNET_WRITECOMMAND 2
@@ -92,8 +93,8 @@
 #define EPMCSH                   0x11
 #define ERXRDPTL                 0x0C
 #define ERXRDPTH                 0x0D
-#define EPMOL                    0x15
-#define EPMOH                    0x16
+#define EPMOL                    0x14
+#define EPMOH                    0x15
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -211,7 +212,7 @@ IFX_INTERRUPT(SpimasterErMcEthernet, 0, 48);                 /* SPI Master ISR f
  * \param McEthernet_Init configuration setup function
  * \return None
  */
-void McEthernet_Init(uint8* MacAddress, uint16 maxFrazeSize)
+void McEthernet_Init(uint8* MacAddress)
 {
   uint8 tmp;
   Ifx_TickTime delay100ms = IfxStm_getTicksFromMilliseconds(BSP_DEFAULT_TIMER,100);
@@ -235,8 +236,8 @@ void McEthernet_Init(uint8* MacAddress, uint16 maxFrazeSize)
   McEthernet_WriteRegister(ERXSTL, (uint8)(0x000 & 0x00FF));
   McEthernet_WriteRegister(ERXSTH, (uint8)(0x000 >> 8));
 
-  McEthernet_WriteRegister(ERXRDPTL, (uint8)(0x000 & 0x00FF));
-  McEthernet_WriteRegister(ERXRDPTH, (uint8)(0x000 >> 8));
+  McEthernet_WriteRegister(ERXRDPTL, (uint8)(0xFFE & 0x00FF));
+  McEthernet_WriteRegister(ERXRDPTH, (uint8)(0xFFE >> 8));
 
   /* Initialize read pointer */
   McEthernet_WriteRegister(ERDPTL, (uint8)(0x002 & 0x00FF));
@@ -257,18 +258,18 @@ void McEthernet_Init(uint8* MacAddress, uint16 maxFrazeSize)
   McEthernet_SetBank(BANK1);
 
   /* Filter receive register */
-  McEthernet_WriteRegister(ERXFCON, 0x40);
+  McEthernet_WriteRegister(ERXFCON, 0xE0);
 
-  /* PATTERN REGISTERS are set 0x0800 */
+  /* PATTERN REGISTERS are set 0x0800  (this need to be checked one day still doesn't work) */
   McEthernet_WriteRegister(EPMOL, 0x00);
   McEthernet_WriteRegister(EPMOH, 0x00);
-  McEthernet_WriteRegister(EPMCSL, 0x08);
-  McEthernet_WriteRegister(EPMCSH, 0x00);
+  McEthernet_WriteRegister(EPMCSL, 0x00);
+  McEthernet_WriteRegister(EPMCSH, 0x08);
   McEthernet_WriteRegister(EPMM0, 0x00);
-  McEthernet_WriteRegister(EPMM0 + 1, 0x30);
+  McEthernet_WriteRegister((EPMM0 + 1), 0x30);
   for (uint8 i = 2; i < 8; i++)
   {
-    McEthernet_WriteRegister(EPMM0 + i, 0x00);
+    McEthernet_WriteRegister((EPMM0 + i), 0x00);
   }
 
   /* Wait for OST */
@@ -284,15 +285,15 @@ void McEthernet_Init(uint8* MacAddress, uint16 maxFrazeSize)
   McEthernet_WriteRegister(MACON1, 0xF);
 
   /* MACON 3 */
-  McEthernet_WriteRegister(MACON3, 0xF8);
+  McEthernet_WriteRegister(MACON3, 0xF6);
 
   /* MACON 4 */
   McEthernet_WriteRegister(MACON4, 0x40);
 
   /* Max Number of bytes per message */
-  McEthernet_WriteRegister(MAMXFLL, (uint8)(maxFrazeSize & 0x00FF));
+  McEthernet_WriteRegister(MAMXFLL, (uint8)(MC_ETHERNET_MAXFRAME & 0x00FF));
 
-  McEthernet_WriteRegister(MAMXFLH, (uint8)(maxFrazeSize >> 8));
+  McEthernet_WriteRegister(MAMXFLH, (uint8)(MC_ETHERNET_MAXFRAME >> 8));
 
   /* Enable Back to Back inter packet */
   McEthernet_WriteRegister(MABBIPG, 0x12);
@@ -306,6 +307,8 @@ void McEthernet_Init(uint8* MacAddress, uint16 maxFrazeSize)
   /* Auto increment of buffer pointer */
   McEthernet_WriteRegister(ECON2, 0x80);
 }
+
+
 
 /** \brief Update internal data when incremental mode is using T2.\n
  * This function set ups the mac address
@@ -343,51 +346,58 @@ static boolean McEthernet_TransmitMsg(uint8* DstMacAddress, uint8* Type, uint8* 
   boolean Result = TRUE;
   uint16 MessagePacketActSize = MC_ETHERNET_MACSIZE + MC_ETHERNET_MACSIZE + MC_ETHERNET_TYPESIZE + MessageSize;
   uint16 EndAddress;
-  McEthernet_WriteRegister(ECON1, 0x0);
-  /* Wrong Message Size */
-  if (MessagePacketActSize > 128)
-  {
-    Result = FALSE;
-  }
 
-  static uint8 MessagePacket[200];
-  for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
-  {
-    MessagePacket[i] = McEthernet_MasterPacketTransmit.DstMacAddress[i];
-  }
-  for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
-  {
-    McEthernet_MasterPacketTransmit.DstMacAddress[i] = DstMacAddress[i];
-    MessagePacket[i + MC_ETHERNET_MACSIZE] = McEthernet_MasterPacketTransmit.SrcMacAddress[i];
-  }
-  McEthernet_MasterPacketTransmit.TypeLength[0] = Type[0];
-  McEthernet_MasterPacketTransmit.TypeLength[1] = Type[1];
-  MessagePacket[MC_ETHERNET_MACSIZE + MC_ETHERNET_MACSIZE] = McEthernet_MasterPacketTransmit.TypeLength[0];
-  MessagePacket[MC_ETHERNET_MACSIZE + MC_ETHERNET_MACSIZE + 1] = McEthernet_MasterPacketTransmit.TypeLength[1];
-  if (MessageSize < McEthernet_MasterPacketTransmit.MessageSize)
-  {
-    for (uint8 i = 0; i < MessageSize; i++)
-    {
-      McEthernet_MasterPacketTransmit.Message[i] = Message[i];
-      MessagePacket[MC_ETHERNET_MACSIZE + MC_ETHERNET_MACSIZE + MC_ETHERNET_TYPESIZE + i] = McEthernet_MasterPacketTransmit.Message[i];
-    }
-  }
   /* Bank 0  Register */
   McEthernet_SetBank(BANK0);
+  McEthernet_WriteRegister(ECON1, 0x0);
 
   /* Set Write Pointer */
-  /* Reset the Write Pointer */
   McEthernet_WriteRegister(EWRPTL, (uint8)((0x1000+1) & 0x00FF));
   McEthernet_WriteRegister(EWRPTH, (uint8)((0x1000+1) >> 8));
-
-  /* Full message transmission */
-  McEthernet_WriteBuffer(MessagePacket, MessagePacketActSize);
 
   /* End of message Address transmission */
   EndAddress = MessagePacketActSize + McEthernet_WriteAddress;
 
   McEthernet_WriteRegister(ETXNDL, (uint8)(EndAddress & 0x00FF));
   McEthernet_WriteRegister(ETXNDH, (uint8)(EndAddress >> 8));
+
+  /* Wrong Message Size */
+  if (MessagePacketActSize > 1520)
+  {
+    Result = FALSE;
+  }
+
+  static uint8 MessagePacket[128];
+  for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
+  {
+    MessagePacket[i] = McEthernet_MasterPacketTransmit.DstMacAddress[i];
+  }
+  McEthernet_WriteBuffer(MessagePacket, MC_ETHERNET_MACSIZE);
+
+  for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
+  {
+    McEthernet_MasterPacketTransmit.DstMacAddress[i] = DstMacAddress[i];
+    MessagePacket[i] = McEthernet_MasterPacketTransmit.SrcMacAddress[i];
+  }
+  McEthernet_WriteBuffer(MessagePacket, MC_ETHERNET_MACSIZE);
+
+  McEthernet_MasterPacketTransmit.TypeLength[0] = Type[0];
+  McEthernet_MasterPacketTransmit.TypeLength[1] = Type[1];
+  MessagePacket[0] = McEthernet_MasterPacketTransmit.TypeLength[0];
+  MessagePacket[1] = McEthernet_MasterPacketTransmit.TypeLength[1];
+  McEthernet_WriteBuffer(MessagePacket, MC_ETHERNET_TYPESIZE);
+
+  if (MessageSize < McEthernet_MasterPacketTransmit.MessageSize)
+  {
+    for (uint8 i = 0; i < MessageSize; i++)
+    {
+      McEthernet_MasterPacketTransmit.Message[i] = Message[i];
+      MessagePacket[i] = McEthernet_MasterPacketTransmit.Message[i];
+    }
+  }
+  /* Full message transmission */
+  McEthernet_WriteBuffer(MessagePacket, MessageSize);
+
 
   /* Enable transmit receive */
   McEthernet_WriteRegister(ECON1, 0x8);
@@ -552,8 +562,8 @@ static boolean McEthernet_ReceiveMsgInf(void)
     McEthernet_WriteRegister(ERDPTL, (uint8)(0x2 & 0x00FF));
     McEthernet_WriteRegister(ERDPTH, (uint8)(0x2 >> 8));
 
-    McEthernet_WriteRegister(ERXRDPTL, (uint8)(0x0 & 0x00FF));
-    McEthernet_WriteRegister(ERXRDPTH, (uint8)(0x0 >> 8));
+    McEthernet_WriteRegister(ERXRDPTL, (uint8)(0xFFE & 0x00FF));
+    McEthernet_WriteRegister(ERXRDPTH, (uint8)(0xFFE >> 8));
 
     McEthernet_ReadAddress = 0x0;
   }
@@ -651,8 +661,8 @@ static void McEthernet_ReadPacket(void)
   McEthernet_WriteRegister(ERDPTH, (uint8)((McEthernet_ReadAddress+2) >> 8));
 
 
-  McEthernet_WriteRegister(ERXRDPTL, (uint8)(McEthernet_ReadAddress & 0x00FF));
-  McEthernet_WriteRegister(ERXRDPTH, (uint8)(McEthernet_ReadAddress >> 8));
+  McEthernet_WriteRegister(ERXRDPTL, (uint8)(0xFFE & 0x00FF));
+  McEthernet_WriteRegister(ERXRDPTH, (uint8)(0xFFE >> 8));
 
 
   McEthernet_ReadAddress += 2;
