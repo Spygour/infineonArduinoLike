@@ -30,10 +30,10 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "MPU6050.h"
-#include "Wire.h"
 #include "Ifx_Types.h"
 #include "Bsp.h"
 #include <stdint.h>
+#include "I2c.h"
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
@@ -44,19 +44,23 @@
 #define MPU6050_GYROREG 0x43
 #define MPU6050_ACCELREG 0x3B
 #define MPU6050_ADDRESS 0x68
+#define MPU6050_BUFFER_SIZE 6
 
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
-static uint8 Mpu6050TxBuffer[6];
-static uint8 Mpu6050RxBuffer[6];
+static uint8 Mpu6050TxBuffer[MPU6050_BUFFER_SIZE];
+static uint8 Mpu6050RxBuffer[MPU6050_BUFFER_SIZE];
 IfxI2c_I2c Mpu6050I2c;
 IfxI2c_I2c_Device Mpu6050dev;
 volatile int16_t accelValues[3];
-float accelX_g,accelY_g,accelZ_g;
-float gyroX_g, gyroY_g, gyroZ_g;
-float gyroRawX, gyroRawY, gyroRawZ;
-float gyroErrX = 0, gyroErrY = 0, gyroErrZ = 0;
+
+static float accelRawX, accelRawY, accelRawZ;
+static float accelErrX, accelErrY, accelErrZ;
+float Mpu6050AccelX, Mpu6050AccelY, Mpu6050AccelZ;
+
+static float gyroRawX, gyroRawY, gyroRawZ;
+static float gyroErrX = 0, gyroErrY = 0, gyroErrZ = 0;
 float Mpu6050AngleX, Mpu6050AngleY ,Mpu6050AngleZ;
 
 static uint64 Mpu6050_LastSample = 0;
@@ -71,6 +75,7 @@ static inline void mpu6050_write(uint8 *data,Ifx_SizeT size);
 static inline void mpu6050_read(uint8* registerAddress, Ifx_SizeT size);
 static inline void initialize_mpu6050_values(void);
 static inline void Mpu6050_ReadGyroError(void);
+static inline void Mpu6050_ReadAccelError(void);
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
@@ -83,6 +88,7 @@ void Mpu6050_Init(void)
   initialize_mpu6050_values();
   wait(Delay200ms);
   Mpu6050_ReadGyroError();
+  Mpu6050_ReadAccelError();
 
 }
 
@@ -107,6 +113,16 @@ static inline void mpu6050_read(uint8* registerAddress, Ifx_SizeT size)
   while (IfxI2c_I2c_read(&Mpu6050dev, &Mpu6050RxBuffer[0], size) == IfxI2c_I2c_Status_nak);
 }
 
+//i2c reset function
+static inline void mpu6050_I2cBufferReset(void)
+{
+  for (uint8 i = 0; i < MPU6050_BUFFER_SIZE; i++)
+  {
+    Mpu6050TxBuffer[i] = 0;
+    Mpu6050RxBuffer[i] = 0;
+  }
+}
+
 static inline void initialize_mpu6050_values(void)
 {
   uint8 data[2];
@@ -126,6 +142,7 @@ static inline void initialize_mpu6050_values(void)
 
 static inline void Mpu6050_ReadRawGyroData(void)
 {
+  mpu6050_I2cBufferReset();
   uint8 mpuGyroReg = MPU6050_GYROREG;
   static int16_t gyrolX, gyrolY, gyrolZ;
   mpu6050_read(&mpuGyroReg,6);
@@ -135,11 +152,6 @@ static inline void Mpu6050_ReadRawGyroData(void)
   gyroRawX = (float)gyrolX/131.0;
   gyroRawY = (float)gyrolY/131.0;
   gyroRawZ = (float)gyrolZ/131.0;
-  //uint64 SampleTicks = (Mpu6050_LastSample > 0) ? (IfxStm_get(&MODULE_STM0) - Mpu6050_LastSample) : 0;
-  //Mpu6050_LastSample = IfxStm_get(&MODULE_STM0);
-  //gyroX_g = gyroErrX * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
-  //gyroY_g = gyroErrX * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
-  //gyroZ_g = gyroErrX * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
 
 
 }
@@ -148,6 +160,7 @@ static inline void Mpu6050_ReadRawGyroData(void)
 
 static inline void Mpu6050_ReadGyroError(void)
 {
+  mpu6050_I2cBufferReset();
   uint16 readCount = 0;
   while (readCount < 200)
   {
@@ -164,6 +177,41 @@ static inline void Mpu6050_ReadGyroError(void)
   gyroErrZ = gyroErrZ/200;
 }
 
+
+
+static inline void Mpu6050_ReadRawAccelData(void)
+{
+  uint8 mpuAccelReg = MPU6050_ACCELREG;
+  static int16_t accelX, accelY, accelZ;
+  mpu6050_read(&mpuAccelReg,6);
+  accelX =  (Mpu6050RxBuffer[0] << 8) | Mpu6050RxBuffer[1];
+  accelY =  (Mpu6050RxBuffer[2] << 8) | Mpu6050RxBuffer[3];
+  accelZ =  (Mpu6050RxBuffer[4] << 8) | Mpu6050RxBuffer[5];
+  accelRawX = (float)accelX/16384.0;
+  accelRawY = (float)accelY/16384.0;
+  accelRawZ = (float)accelZ/16384.0;
+}
+
+
+static inline void Mpu6050_ReadAccelError(void)
+{
+  uint16 readCount = 0;
+  while (readCount < 200)
+  {
+    Mpu6050_ReadRawGyroData();
+    accelErrX +=  accelRawX;
+    accelErrY +=  accelRawY;
+    accelErrZ +=  accelRawZ;
+
+    readCount++;
+
+  }
+  accelErrX = accelErrX/200;
+  accelErrY = accelErrY/200;
+  accelErrZ = accelErrZ/200;
+
+}
+
 void Mpu6050_ReadAngle(void)
 {
   Mpu6050_ReadRawGyroData();
@@ -177,6 +225,22 @@ void Mpu6050_ReadAngle(void)
   Mpu6050AngleX += gyroRawX * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
   Mpu6050AngleY += gyroRawY * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
   Mpu6050AngleZ += gyroRawZ * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
+
+}
+
+void Mpu6050_ReadAccel(void)
+{
+  Mpu6050_ReadRawAccelData();
+
+  accelRawX -= accelErrX;
+  accelRawY -= accelErrY;
+  accelRawZ -= accelErrZ;
+  uint64 SampleTicks = (Mpu6050_LastSample > 0) ? (IfxStm_get(&MODULE_STM0) - Mpu6050_LastSample) : 0;
+  Mpu6050_LastSample = IfxStm_get(&MODULE_STM0);
+
+  Mpu6050AccelX += accelRawX * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
+  Mpu6050AccelY += accelRawY * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
+  Mpu6050AccelZ += accelRawZ * SampleTicks/IfxStm_getFrequency(&MODULE_STM0);
 
 }
 

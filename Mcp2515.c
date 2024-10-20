@@ -37,7 +37,7 @@
 #define WRITE_COMMAND 2
 #define READ_COMMAND 3
 #define BIT_MODIFY 5
-#define SPIBAUDRATE 10000000.0
+#define MCP2515_SPIBAUDRATE 10000000.0
 
 /* Can Transmit Registers */
 #define CNF1      0x2A
@@ -108,7 +108,7 @@ SpiChannel_t Mcp2515Channel;
 
 SpiChannelConfig McpChannelCfg = {
     &IfxQspi1_SLSO5_P11_2_OUT,
-    SPIBAUDRATE,
+    MCP2515_SPIBAUDRATE,
     0,
     SpiIf_ShiftClock_shiftTransmitDataOnTrailingEdge,
     SpiIf_DataHeading_msbFirst

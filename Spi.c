@@ -44,8 +44,8 @@
 IfxQspi_SpiSlave  *SpiSlave1Ptr = NULL_PTR;
 
 
-uint8 SpiTxBuffer[20];
-uint8 SpiRxBuffer[20];
+static uint8 SpiTxBuffer[100];
+static uint8 SpiRxBuffer[100];
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -134,11 +134,23 @@ uint8 SpiRxBuffer[20];
 
  }
 
- void Spi_ReadRegister(SpiChannel_t* SpiChannel, uint8 Reg, uint8* regVal, uint8 size)
+ void Spi_WriteRegisterVal(SpiChannel_t* SpiChannel, uint8 Reg, uint8 Val)
+ {
+   while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
+   SpiTxBuffer[0] = Reg;
+   SpiTxBuffer[1] = Val;
+       // receive new stream
+   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], &SpiRxBuffer[0], 2);
+
+   while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy);
+
+ }
+
+ void Spi_ReadRegister(SpiChannel_t* SpiChannel, uint8 Reg, uint8* regVal, uint16 size)
  {
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
    SpiTxBuffer[0] =  Reg;
-   for(uint8 i = 0; i < size; i++)
+   for(uint16 i = 0; i < size; i++)
    {
      SpiTxBuffer[i+1] = 0xFF;
    }
@@ -147,13 +159,13 @@ uint8 SpiRxBuffer[20];
 
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
 
-   for(uint8 i=0; i<size;i++)
+   for(uint16 i=0; i<size;i++)
    {
      regVal[i] = SpiRxBuffer[i+1];
    }
  }
 
- void Spi_WriteBytes(SpiChannel_t* SpiChannel, uint8* Src, uint8 size)
+ void Spi_WriteBytes(SpiChannel_t* SpiChannel, uint8* Src, uint16 size)
  {
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
    for(uint8 i = 0; i < size; i++)
@@ -166,25 +178,25 @@ uint8 SpiRxBuffer[20];
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
  }
 
- void Spi_ReadBytes(SpiChannel_t* SpiChannel,uint8* Src, uint8 SrcSize, uint8* Dest, uint8 DestSize)
+ void Spi_ReadBytes(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint8* Dest, uint16 DestSize)
  {
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
    for(uint8 i=0;i<SrcSize;i++)
    {
      SpiTxBuffer[i] = Src[i];
    }
-   for(uint8 i = SrcSize; i < SrcSize+DestSize; i++)
+   for(uint16 i = SrcSize; i < (DestSize + 1); i++)
    {
      SpiTxBuffer[i] = 0xFF;
    }
        // receive new stream
-   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], &SpiRxBuffer[0], SrcSize + DestSize);
+   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], &SpiRxBuffer[0], DestSize + 1);
 
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
 
-   for(uint8 i = 0; i < DestSize; i++)
+   for(uint16 i = 0; i < DestSize; i++)
    {
-     Dest[i] = SpiRxBuffer[i+SrcSize];
+     Dest[i] = SpiRxBuffer[i+1];
    }
 
  }
@@ -246,7 +258,7 @@ void Spi_SlaveInit(IfxQspi_SpiSlave* SpiSlave,SpiSlavePins_t* SpiSlavePins, SpiC
 
 }
 
-void Spi_SlaveExchange(IfxQspi_SpiSlave* SpiSlave, uint8* SpiSlaveTx, uint8* SpiSlaveRx, uint8 size)
+void Spi_SlaveExchange(IfxQspi_SpiSlave* SpiSlave, uint8* SpiSlaveTx, uint8* SpiSlaveRx, uint16 size)
 {
   for (uint8 i = 0; i < size; i++)
   {

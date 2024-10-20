@@ -75,4 +75,6 @@ boolean SerialCmpString(uint8* message,Ifx_SizeT message_len);
 /*Read-Write buffer return function */
 uint8 Get_readBuf(Ifx_SizeT index);
 void SerialremoveReadFifo(void);
+void RstReadBuf(void);
+void RstWriteBuf(void);
 #endif /* SERIALINIT_H_ */

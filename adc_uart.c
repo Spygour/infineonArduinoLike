@@ -58,7 +58,7 @@ IfxVadc_Adc g_vadc;                             /* Handle for VADC registers ins
 IfxVadc_Adc_Group g_adcGroup;                   /* Handle for the VADC group registers                              */
 IfxVadc_Adc_Channel g_adcChannel[N_CHANNELS];
 
-uint8 SerialPrinBuffer[128] = {''};
+uint8 SerialPrintBuffer[128] = {''};
 
 uint8 g_uartTxBuffer[ASC_TX_BUFFER_SIZE + sizeof(Ifx_Fifo) + 8];
 uint8 g_uartRxBuffer[ASC_RX_BUFFER_SIZE + sizeof(Ifx_Fifo) + 8];
@@ -276,38 +276,38 @@ void UartWriteln(uint8 *message,Ifx_SizeT length)
 {
   for (Ifx_SizeT i=0;i<length;i++)
   {
-    SerialPrinBuffer[i] = message[i];
+    SerialPrintBuffer[i] = message[i];
   }
-  SerialPrinBuffer[length-1] = '\r';
-  SerialPrinBuffer[length] = '\n';
-  SerialPrinBuffer[length+1] = '\0';
+  SerialPrintBuffer[length-1] = '\r';
+  SerialPrintBuffer[length] = '\n';
+  SerialPrintBuffer[length+1] = '\0';
   Ifx_SizeT real_size = length+2;
-  IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
+  IfxAsclin_Asc_write(&g_asc,&SerialPrintBuffer[0],&real_size,TIME_INFINITE);
 }
 
 void UartWrite(uint8 *message,Ifx_SizeT length)
 {
   for (Ifx_SizeT i=0;i<length;i++)
   {
-    SerialPrinBuffer[i] = message[i];
+    SerialPrintBuffer[i] = message[i];
   }
-  SerialPrinBuffer[length-1] = '\r';
-  SerialPrinBuffer[length] = '\0';
+  SerialPrintBuffer[length-1] = '\r';
+  SerialPrintBuffer[length] = '\0';
   Ifx_SizeT real_size = length+1;
-  IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
+  IfxAsclin_Asc_write(&g_asc,&SerialPrintBuffer[0],&real_size,TIME_INFINITE);
 }
 
 void UartWriteWithChar(uint8 *message,Ifx_SizeT length,char special_char)
 {
   for (Ifx_SizeT i=0;i<length;i++)
   {
-    SerialPrinBuffer[i] = message[i];
+    SerialPrintBuffer[i] = message[i];
   }
-  SerialPrinBuffer[length-1] = '\r';
-  SerialPrinBuffer[length] = special_char;
-  SerialPrinBuffer[length+1] = '\0';
+  SerialPrintBuffer[length-1] = '\r';
+  SerialPrintBuffer[length] = special_char;
+  SerialPrintBuffer[length+1] = '\0';
   Ifx_SizeT real_size = length+2;
-  IfxAsclin_Asc_write(&g_asc,SerialPrinBuffer,&real_size,TIME_INFINITE);
+  IfxAsclin_Asc_write(&g_asc,&SerialPrintBuffer[0],&real_size,TIME_INFINITE);
 }
 
 
@@ -333,7 +333,7 @@ void asc0ErISR(void){
 void receive_data(Ifx_SizeT length)
 {
     /* Receive data */
-    IfxAsclin_Asc_read(&g_asc, UsbRxBuffer, &length, TIME_INFINITE);
+    IfxAsclin_Asc_read(&g_asc, &UsbRxBuffer[0], &length, TIME_INFINITE);
 }
 
 void UartRstRxBuffer(void)
