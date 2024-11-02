@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file Dma.c
+ * \file MicrochipEthernet.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -25,18 +25,39 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
+#ifndef INFINEONARDUINOLIKE_MCETHERNETPACKET_H_
+#define INFINEONARDUINOLIKE_MCETHERNETPACKET_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "Dma.h"
+#include "Ifx_Types.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define ISR_PRIORITY_DMA 3
+
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
+extern uint16 McEth_WriteAddress;
+/*********************************************************************************************************************/
+/*-------------------------------------------------Data Structures---------------------------------------------------*/
+/*********************************************************************************************************************/
+typedef enum
+{
+  TRANSMIT_MESSAGE,
+  RECEIVE_MESSAGE
+}MCETH_TYPE;
+
+typedef struct
+{
+    uint8*          SrcMacAddress;
+    uint8*          DstMacAddress;
+    uint8*          TypeLength;
+    uint8           MacAddressSize;
+    uint8           TypeLengthSize;
+    MCETH_TYPE      Type;
+}MCETH_PACKET;
 
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
@@ -45,80 +66,17 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
+void McEth_SetMacAddress(uint8* MacAddress);
+void McEth_Init(uint8* MacAddress);
+void McEth_CreateTransmitPacket(uint8* DstMacAddress, uint8* Type);
+boolean McEth_PushTransmitMessage(uint8* Message, uint16 MessageSize);
+boolean McEth_TransmitMessage(void);
+boolean McEthernert_ReceiveMsg(float32 time);
+boolean McEth_ReceiveMsgInf(void);
+void McEth_ReadEthernetProperties(void);
+void McEth_ReadReceivedBytes(uint8* ReceivePtr, uint16 ReceivePtrSize);
+void McEth_ResetReceiveBuffer(void);
+boolean McEth_WriteTransmitMemory(uint16 startMemory, uint8* newMessage, uint16 size);
+uint16 McEth_ReadWritePointer(void);
 
-/*********************************************************************************************************************/
-/*---------------------------------------------Function Implementations----------------------------------------------*/
-/*********************************************************************************************************************/
-
-IFX_INTERRUPT(ISR_feedback, 0, ISR_PRIORITY_DMA);
-void ISR_feedback(void)
-{
-     /* It goes inside no need to do anything yet */
-}
-
-
-void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress)
-{
-  IfxDma_Dma Dma_Inst;
-  /* Create module configuration */
-  IfxDma_Dma_Config dmaConfig;
-  IfxDma_Dma_initModuleConfig(&dmaConfig, &MODULE_DMA);
-
-  /* Initialize module */
-  IfxDma_Dma_initModule(&Dma_Inst, &dmaConfig);
-
-  /* Initial channel configuration */
-  IfxDma_Dma_ChannelConfig DmaChCfg;
-  IfxDma_Dma_initChannelConfig(&DmaChCfg, &Dma_Inst);
-
-  /* Following settings are used by all transactions of the linked list */
-  DmaChCfg.channelId = DmaChannel->channelId;
-  DmaChCfg.transferCount = BytesPerTransfer;
-  DmaChCfg.requestMode = IfxDma_ChannelRequestMode_completeTransactionPerRequest;
-  DmaChCfg.moveSize = IfxDma_ChannelMoveSize_8bit;
-  DmaChCfg.operationMode = IfxDma_ChannelOperationMode_single;
-
-  /* Source Address configuration */
-  DmaChCfg.sourceAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
-  DmaChCfg.sourceAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
-  DmaChCfg.sourceAddressCircularRange = IfxDma_ChannelIncrementCircular_none;
-
-  /* Destination Address configuration */
-  DmaChCfg.destinationAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
-  DmaChCfg.destinationAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
-  DmaChCfg.destinationAddressCircularRange = IfxDma_ChannelIncrementCircular_none;
-
-  /* Handle the source and destination Address */
-  DmaChCfg.sourceAddress = (uint32)SourceAddress;
-  DmaChCfg.destinationAddress = (uint32)DestinationAddress;
-
-  /* ISR control */
-  DmaChCfg.channelInterruptEnabled = TRUE;
-  DmaChCfg.channelInterruptControl = IfxDma_ChannelInterruptControl_thresholdLimitMatch;
-  DmaChCfg.channelInterruptPriority = ISR_PRIORITY_DMA;
-  DmaChCfg.channelInterruptTypeOfService = IfxSrc_Tos_cpu0;
-
-  IfxDma_Dma_initChannel(DmaChannel, &DmaChCfg);
-}
-
-
-void Dma_Transfer(IfxDma_Dma_Channel* DmaChannel)
-{
-  IfxDma_Dma_startChannelTransaction(DmaChannel);
-}
-
-void Dma_SetSourceAddress(IfxDma_Dma_Channel* DmaChannel,  uint32 SourceAddress)
-{
-  IfxDma_Dma_setChannelSourceAddress(DmaChannel, SourceAddress);
-}
-
-void Dma_SetDestinationAddress(IfxDma_Dma_Channel* DmaChannel,  uint32 DestinationAddress)
-{
-  IfxDma_Dma_setChannelDestinationAddress(DmaChannel, DestinationAddress);
-}
-
-void Dma_ChangeTranferSize(IfxDma_Dma_Channel* DmaChannel,  uint16 Size)
-{
-  IfxDma_Dma_setChannelTransferCount(DmaChannel, Size);
-}
-
+#endif /* INFINEONARDUINOLIKE_McEthPACKET_H_ */

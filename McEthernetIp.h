@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file MicrochipEthernet.h
+ * \file McEthernetIp.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -25,16 +25,82 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-#ifndef INFINEONARDUINOLIKE_MCETHERNET_H_
-#define INFINEONARDUINOLIKE_MCETHERNET_H_
+#ifndef INFINEONARDUINOLIKE_MCETHERNETIP_H_
+#define INFINEONARDUINOLIKE_MCETHERNETIP_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "Spi.h"
+#include "Ifx_Types.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
+typedef struct MCETH_IP_NODE
+{
+    uint8* PacketMessage;
+    uint8  PacketSize;
+    struct ETHERNET_IP_NODE *NextNode;
+}MCETH_IP_NODE;
+
+typedef enum
+{
+  ETH_TRANSMIT_IDLE,
+  SEND_ETHERNET_HEADER,
+  SEND_IP_HEADER,
+  SEND_TCP_HEADER,
+  SEND_PAYLOAD,
+  ETH_TRANSMIT_VALIDATE
+}MCETH_IP_TRANSMIT_STATE;
+
+typedef enum
+{
+  ETH_RECEIVE_IDLE,
+  READ_ETHERNET_HEADER,
+  READ_IP_HEADER,
+  READ_TCP_HEADER,
+  READ_PAYLOAD,
+  ETH_RECEIVE_VALIDATE
+}MCETH_IP_RECEIVE_STATE;
+
+typedef struct
+{
+    uint8*        McEthIp_SrcAddress;
+    uint8*        McEthIp_DstAddress;
+}MCETHIP_IP;
+
+typedef struct
+{
+    uint8      Version_HeaderLength;
+    uint8      DifferecialServices;
+    uint16     TotalLength;
+    uint16     Identification;
+    uint16     FragmentOffset;
+    uint8      TimeToLive;
+    uint8      Protocol;
+    uint16     CheckSum;
+    MCETHIP_IP *SrcDstIpAddress;
+}MCETH_IPHEADER;
+
+typedef struct
+{
+   uint16  SrcPort;
+   uint16  DstPort;
+   uint32  SeqNumber;
+   uint32  Aknowledgment;
+   uint8   DataOffset;
+   uint8   Flags;
+   uint16  WindowSize;
+   uint16  CheckSum;
+   uint16  UrgentPointer;
+   uint16  Options;
+}MCETH_TCPHEADER;
+
+typedef struct
+{
+    MCETH_IPHEADER* IpHeader;
+    MCETH_TCPHEADER* TcpHeader;
+}MCETH_HEADER;
+
 
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
@@ -43,24 +109,7 @@
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
-typedef enum
-{
-  TRANSMIT_MESSAGE,
-  RECEIVE_MESSAGE
-}McEthernet_Type;
-
-typedef struct
-{
-    uint8*          SrcMacAddress;
-    uint8*          DstMacAddress;
-    uint8*          TypeLength;
-    uint8*          Message;
-    uint8           MacAddressSize;
-    uint8           TypeLengthSize;
-    uint8           MessageSize;
-    McEthernet_Type Type;
-}McEthernet_Packet;
-
+ 
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -68,10 +117,5 @@ typedef struct
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void McEthernet_SetMacAddress(uint8* MacAddress);
-void McEthernet_Init(uint8* MacAddress);
-void McEthernet_WriteMsg(uint8* DstMacAddress, uint8* Type, uint8* Message, uint8 MessageSize);
-void McEthernet_ReadMsg(float32 time);
-void McEthernet_ReadMsgInf(void);
 
-#endif /* INFINEONARDUINOLIKE_MCETHERNET_H_ */
+#endif /* INFINEONARDUINOLIKE_McEthIP_H_ */
