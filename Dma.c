@@ -33,7 +33,7 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define ISR_PRIORITY_DMA 3
+
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -50,14 +50,8 @@
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 
-IFX_INTERRUPT(ISR_feedback, 0, ISR_PRIORITY_DMA);
-void ISR_feedback(void)
-{
-     /* It goes inside no need to do anything yet */
-}
 
-
-void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress)
+void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority)
 {
   IfxDma_Dma Dma_Inst;
   /* Create module configuration */
@@ -95,11 +89,12 @@ void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 So
   /* ISR control */
   DmaChCfg.channelInterruptEnabled = TRUE;
   DmaChCfg.channelInterruptControl = IfxDma_ChannelInterruptControl_thresholdLimitMatch;
-  DmaChCfg.channelInterruptPriority = ISR_PRIORITY_DMA;
+  DmaChCfg.channelInterruptPriority = Priority;
   DmaChCfg.channelInterruptTypeOfService = IfxSrc_Tos_cpu0;
 
   IfxDma_Dma_initChannel(DmaChannel, &DmaChCfg);
 }
+
 
 
 void Dma_Transfer(IfxDma_Dma_Channel* DmaChannel)

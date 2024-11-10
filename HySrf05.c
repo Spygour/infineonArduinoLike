@@ -63,24 +63,22 @@ void HySrf05_init(void)
 {
   HySrfDelay = IfxStm_getTicksFromMicroseconds(BSP_DEFAULT_TIMER, 10);
   setPinInputNoPull(ECHO_PIN);
-  IfxPort_setPinPadDriver(ECHO_PIN, IfxPort_PadDriver_cmosAutomotiveSpeed2);
   setPinOutput(TRIGGER_PIN);
-  IfxPort_setPinPadDriver(TRIGGER_PIN, IfxPort_PadDriver_cmosAutomotiveSpeed2);
-  setPinOutputFalse(TRIGGER_PIN);
+  IfxPort_setPinPadDriver(TRIGGER_PIN, IfxPort_PadDriver_ttlSpeed1);
 }
 
 void HySrf05_captureDistance(void)
 {
+  static uint64 echoTicks = 0;
+  static float echo = 0;
   setPinOutputTrue(TRIGGER_PIN);
   wait(HySrfDelay);
   setPinOutputFalse(TRIGGER_PIN);
-  static uint64 echoTicks = 0;
-  static float echo = 0;
   while (getPinState(ECHO_PIN) == FALSE){}
   echoTicks = IfxStm_get(&MODULE_STM0);
   while (getPinState(ECHO_PIN) == TRUE) {}
   echoTicks = IfxStm_get(&MODULE_STM0) - echoTicks;
-  echo = (float)(echoTicks/100000000);
+  echo = (float)(echoTicks)/IfxStm_getFrequency(&MODULE_STM0);
 
   /* Distance = 100*period*speed_of_light/2  cm */
   HySrf05Distance = (100*(float)echo*343)/2;

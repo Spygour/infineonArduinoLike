@@ -31,69 +31,73 @@
 /*********************************************************************************************************************/
 #include "McEthernetIp.h"
 #include "McEthernetPacket.h"
-#include "Dma.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
 #define MCETHIP_DATASIZE     128
 #define MCETHIP_HEADER_LEN   20
+#define MCETHIP_ARP_PACKETLEN 28
 #define MCETHIP_ADDRESS_SIZE 4
+#define DMA_ETHTRANSMITPRIORITY 3
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
 uint16 McEthIp_TransmitTcpChecksum;
 uint8 McEthIp_TransmitBuffer[MCETHIP_DATASIZE];
 
-MCETH_IP_NODE McEthIp_IpNode = {
-    McEthIp_TransmitBuffer,
-    MCETHIP_DATASIZE,
-    NULL_PTR
-};
-
-
-static uint8 MCETHIP_TxSrcIpAddress[MCETHIP_ADDRESS_SIZE] = {0, 0, 0, 0};
+static uint8 McEthIp_TxSrcIpAddress[MCETHIP_ADDRESS_SIZE] = {192, 168, 2, 1};
 static uint8 McEthIp_TxDstIpAddress[MCETHIP_ADDRESS_SIZE] = {0, 0, 0, 0};
-static MCETHIP_IP McEth_TxIpAddress = {
-    MCETHIP_TxSrcIpAddress,
-    McEthIp_TxDstIpAddress
+
+static MCETHIP_IP_ADDRESS McEthIp_IpAddress = {
+    .IpSrcAddress = McEthIp_TxSrcIpAddress,
+    .IpDstAddress = McEthIp_TxDstIpAddress
 };
 
-static MCETH_IPHEADER McEth_TxIpHeader = {
-    0x45,
-    0x00,
-    0,
-    0,
-    0x4000,
-    0x40,
-    0x06,
-    0,
-    &McEth_TxIpAddress
+static MCETHIP_TCP_ADDRESS McEthIp_TcpAddress =
+{
+    .TcpSrc = 0x8795,
+    .TcpDst = 0x01BB
 };
 
-static MCETH_TCPHEADER McEth_TxTcpHeader = {
-    0x8795,
-    0x01BB,
-    0x00000001,
-    0x00000001,
-    0x50,
-    0x18,
-    0xFFFF,
-    0x0,
-    0x0,
-    0x0
+static MCETHIP_IPHEADER McEthIp_IpHeader = {
+    .SrcDstIpAddress = &McEthIp_IpAddress,
+    .Version_HeaderLength = 0x45,
+    .DifferecialServices = 0x00,
+    .TotalLength = 0,
+    .Identification = 0,
+    .FragmentOffset = 0x4000,
+    .TimeToLive = 0x40,
+    .Protocol = 0x06,
+    .CheckSum = 0
 };
 
-MCETH_HEADER McEthIp_TxHeader = {
-    &McEth_TxIpHeader,
-    &McEth_TxTcpHeader
+static MCETHIP_TCPHEADER McEthIp_TcpHeader = {
+    .TcpSrcDst = &McEthIp_TcpAddress,
+    .SeqNumber = 0x00000000,
+    .Aknowledgment = 0x00000000,
+    .DataOffsetAndFlags = 0x58,
+    .WindowSize = 0xFFFF,
+    .CheckSum = 0x0,
+    .UrgentPointer = 0x0
 };
-
-uint8 McEthIp_TcpHeader[MCETHIP_HEADER_LEN];
 
 MCETH_IP_TRANSMIT_STATE McEthIp_TransmitState = ETH_TRANSMIT_IDLE;
 MCETH_IP_RECEIVE_STATE McEthIp_ReceiveState = ETH_RECEIVE_IDLE;
 
-IfxDma_Dma_Channel McEthiIp_DmaPachetHandler;
+IfxDma_Dma_Channel McEthIp_DmaTransmitPachetHandler;
+
+
+MCETHIP_PAYLOAD McEthIp_Payload =
+{
+    .WritePayloadIndex = 0x0,
+    .ReadPayloadIndex = 0x0,
+    .Buffer = McEth_Buf,
+    .WriteBufferSize = 0,
+    .ReadBufferSize = MC_ETHERNET_MAXFRAME
+};
+
+MCETHIP_ARP_TRANSMIT_STATE McEthIp_SendARPState = ETH_CREATE_ARP;
+MCETHIP_ARP_TRANSMIT_STATE McEthIp_GetARPState = ETH_GET_ARP;
 
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
@@ -102,11 +106,22 @@ IfxDma_Dma_Channel McEthiIp_DmaPachetHandler;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-static inline void McEthUpdateIpCheckSum(uint8* IpHeader);
-static inline void McEthUpdateTcpCheckSum(uint8* BytesArray, uint16 size);
+static void McEthIpUpdateIpCheckSum(uint8* IpHeader);
+static void McEthIpUpdateTcpCheckSum(uint8* BytesArray, uint16 size);
+static uint16 McEthIpCheckSumCalc(uint8* BytesArray, uint16 size);
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
+/** \brief Dma Isr for the transmition
+ * \param McEthIp_DmaTransmitIsr
+ * \return void
+ */
+IFX_INTERRUPT(McEthIp_DmaTransmitIsr, 0, DMA_ETHTRANSMITPRIORITY);
+void McEthIp_DmaTransmitIsr(void)
+{
+     /* It goes inside no need to do anything yet */
+}
+
 
 
 /** \brief Initializes the Ethernet Module
@@ -114,13 +129,69 @@ static inline void McEthUpdateTcpCheckSum(uint8* BytesArray, uint16 size);
  * \param McEthIp_Init
  * \return void
  */
-void McEthIp_Init(uint8* MacAddress)
+void McEthIp_Init(uint8* SrcMacAddress)
 {
-  McEthiIp_DmaPachetHandler.channelId = IfxDma_ChannelId_0;
+  McEthIp_DmaTransmitPachetHandler.channelId = IfxDma_ChannelId_0;
 
   /* Initialize the Source and Destination to be the same  then it will change in the next transaction */
-  Dma_Init(&McEthiIp_DmaPachetHandler, 128, (uint32)(&McEthIp_TransmitBuffer[0]), (uint32)(&McEthIp_TransmitBuffer[0]));
-  McEth_Init(MacAddress);
+  Dma_Init(&McEthIp_DmaTransmitPachetHandler, 128, (uint32)(&McEthIp_TransmitBuffer[0]), (uint32)(&McEthIp_TransmitBuffer[0]), DMA_ETHTRANSMITPRIORITY);
+  McEth_Init(SrcMacAddress);
+}
+
+
+
+/** \brief Sets the Source IP Address
+ * \param McEth_SetSrcIpAddress
+ * \return void
+ */
+void McEthIp_SetSrcIpAddress(uint8* IpAddress)
+{
+  for (uint8 i = 0; i < 4; i++)
+  {
+    McEthIp_TxSrcIpAddress[i] = IpAddress[i];
+  }
+}
+
+
+
+/** \brief Sets the Destination IP Address
+ * \param McEth_SetDstIpAddress
+ * \return void
+ */
+void McEthIp_SetDstIpAddress(uint8* IpAddress)
+{
+  for (uint8 i = 0; i < 4; i++)
+  {
+    McEthIp_TxDstIpAddress[i] = IpAddress[i];
+  }
+}
+
+
+
+/** \brief Gets the Source IP Address
+ * \param McEth_GetSrcIpAddress
+ * \return void
+ */
+void McEthIp_GetSrcIpAddress(uint8* ptr)
+{
+  for (uint8 i = 0; i < 4; i++)
+  {
+    ptr[i] = McEthIp_TxSrcIpAddress[i];
+  }
+}
+
+
+
+/** \brief Gets the Destination IP Address
+ * \param McEth_GetDstIpAddress
+ * \return void
+ */
+void McEthIp_GetDstIpAddress(uint8* ptr)
+{
+  for (uint8 i = 0; i < 4; i++)
+  {
+    ptr[i] = McEthIp_TxDstIpAddress[i];
+  }
 }
 
 
@@ -129,48 +200,40 @@ void McEthIp_Init(uint8* MacAddress)
  * \param McEth_CreateIpHeader
  * \return void
  */
-static void McEth_CreateIpHeader(MCETHIP_IP* IpAddress, uint16 PayloadSize)
+static void McEthIp_CreateIpHeader(uint16 PayloadSize)
 {
-  static uint8 McEthIp_IpHeader[20];
-  uint16 MessageLength = 14 + 2*MCETHIP_HEADER_LEN + PayloadSize;
+  static uint8 McEthIp_IpHeaderTemp[20];
+  uint16 MessageLength = 14 + MCETHIP_HEADER_LEN + MCETHIP_HEADER_LEN + PayloadSize;
   /* Type is Ipv4 for now */
-  McEthIp_IpHeader[0] = McEthIp_TxHeader.IpHeader->Version_HeaderLength;
+  McEthIp_IpHeaderTemp[0] = McEthIp_IpHeader.Version_HeaderLength;
   /* Type of service is 0 */
-  McEthIp_IpHeader[1] = McEthIp_TxHeader.IpHeader->DifferecialServices;
+  McEthIp_IpHeaderTemp[1] = McEthIp_IpHeader.DifferecialServices;
   /* Total Length */
-  McEthIp_IpHeader[2] = (uint8)(MessageLength >> 8);
-  McEthIp_IpHeader[3] = (uint8)(MessageLength & 0x00FF);
-  McEthIp_TxHeader.IpHeader->TotalLength = MessageLength;
+  McEthIp_IpHeaderTemp[2] = (uint8)(MessageLength >> 8);
+  McEthIp_IpHeaderTemp[3] = (uint8)(MessageLength & 0x00FF);
+  McEthIp_IpHeader.TotalLength = MessageLength;
   /* Identification */
-  McEthIp_IpHeader[4] = (uint8)(McEthIp_TxHeader.IpHeader->Identification >> 8);
-  McEthIp_IpHeader[5] = (uint8)(McEthIp_TxHeader.IpHeader->Identification & 0x00FF);
+  McEthIp_IpHeaderTemp[4] = (uint8)(McEthIp_IpHeader.Identification >> 8);
+  McEthIp_IpHeaderTemp[5] = (uint8)(McEthIp_IpHeader.Identification & 0x00FF);
   /* Fragment Deactivated */
-  McEthIp_IpHeader[6] = (uint8)(McEthIp_TxHeader.IpHeader->FragmentOffset >> 8);
-  McEthIp_IpHeader[7] = (uint8)(McEthIp_TxHeader.IpHeader->FragmentOffset & 0x00FF);
+  McEthIp_IpHeaderTemp[6] = (uint8)(McEthIp_IpHeader.FragmentOffset >> 8);
+  McEthIp_IpHeaderTemp[7] = (uint8)(McEthIp_IpHeader.FragmentOffset & 0x00FF);
   /* TTL in case we speak with router */
-  McEthIp_IpHeader[8] = McEthIp_TxHeader.IpHeader->TimeToLive;
+  McEthIp_IpHeaderTemp[8] = McEthIp_IpHeader.TimeToLive;
   /* TCP protocol for now */
-  McEthIp_IpHeader[9] = McEthIp_TxHeader.IpHeader->Protocol;
+  McEthIp_IpHeaderTemp[9] = McEthIp_IpHeader.Protocol;
   /* Header Checksum 0 after the initialization will be updated */
-  McEthIp_IpHeader[10] = 0x00;
-  McEthIp_IpHeader[11] = 0x00;
+  McEthIp_IpHeaderTemp[10] = 0x00;
+  McEthIp_IpHeaderTemp[11] = 0x00;
   /* Store the SrcAddress */
-  for (uint8 i = 0; i < 4; i++)
-  {
-    McEthIp_IpHeader[12 + i] = IpAddress->McEthIp_SrcAddress[i];
-    McEthIp_TxHeader.IpHeader->SrcDstIpAddress->McEthIp_SrcAddress[i] = IpAddress->McEthIp_SrcAddress[i];
-  }
+  McEthIp_GetSrcIpAddress(&McEthIp_IpHeaderTemp[12]);
   /* Store the DstAddress */
-  for (uint8 i = 0; i < 4; i++)
-  {
-    McEthIp_IpHeader[16 + i] = IpAddress->McEthIp_DstAddress[i];
-    McEthIp_TxHeader.IpHeader->SrcDstIpAddress->McEthIp_DstAddress[i] = IpAddress->McEthIp_DstAddress[i];
-  }
+  McEthIp_GetDstIpAddress(&McEthIp_IpHeaderTemp[16]);
 
-  McEthUpdateIpCheckSum(McEthIp_IpHeader);
-  McEthIp_TxHeader.IpHeader->CheckSum = (uint16)((McEthIp_IpHeader[10] << 8) | (McEthIp_IpHeader[11]));
-  McEthIp_TxHeader.IpHeader->Identification = (McEthIp_TxHeader.IpHeader->Identification == 0xFFFF) ? 1 : McEthIp_TxHeader.IpHeader->Identification+1;
-  if (McEth_PushTransmitMessage(McEthIp_IpHeader, MCETHIP_HEADER_LEN))
+  McEthIpUpdateIpCheckSum(McEthIp_IpHeaderTemp);
+  McEthIp_IpHeader.CheckSum = (uint16)((McEthIp_IpHeaderTemp[10] << 8) | (McEthIp_IpHeaderTemp[11]));
+  McEthIp_IpHeader.Identification = (McEthIp_IpHeader.Identification == 0xFFFF) ? 1 : McEthIp_IpHeader.Identification+1;
+  if (McEth_PushTransmitMessage(McEthIp_IpHeaderTemp, MCETHIP_HEADER_LEN))
   {
     /* Ok */
   }
@@ -186,51 +249,51 @@ static void McEth_CreateIpHeader(MCETHIP_IP* IpAddress, uint16 PayloadSize)
  * \param McEth_CreateTcpHeader
  * \return void
  */
-static void McEth_CreateTcpHeader(uint16 PayloadSize)
+static void McEthIp_CreateTcpHeader(uint16 PayloadSize)
 {
-  /* Message will be pushed with checksum of tcp for now Write value of CheckSum will be stored for future use */
-  McEthIp_TxHeader.TcpHeader->Aknowledgment = McEthIp_TxHeader.TcpHeader->SeqNumber + PayloadSize;
   /* This variable needs to be stored in order to update the checksum correctly */
   McEthIp_TransmitTcpChecksum = McEth_WriteAddress + 17;
-  static uint8 McEthIp_TcpHeader[20];
+  static uint8 McEthIp_TcpHeaderTemp[20];
   /* Source Port 2 bytes */
-  McEthIp_TcpHeader[0] = (uint8)(McEthIp_TxHeader.TcpHeader->SrcPort >> 8);
-  McEthIp_TcpHeader[1] = (uint8)(McEthIp_TxHeader.TcpHeader->SrcPort & 0x00FF);
+  McEthIp_TcpHeaderTemp[0] = (uint8)(McEthIp_TcpHeader.TcpSrcDst->TcpSrc >> 8);
+  McEthIp_TcpHeaderTemp[1] = (uint8)(McEthIp_TcpHeader.TcpSrcDst->TcpSrc & 0x00FF);
   /* Destination Port 2 bytes */
-  McEthIp_TcpHeader[2] = (uint8)(McEthIp_TxHeader.TcpHeader->DstPort >> 8);
-  McEthIp_TcpHeader[3] = (uint8)(McEthIp_TxHeader.TcpHeader->DstPort & 0x00FF);
+  McEthIp_TcpHeaderTemp[2] = (uint8)(McEthIp_TcpHeader.TcpSrcDst->TcpDst >> 8);
+  McEthIp_TcpHeaderTemp[3] = (uint8)(McEthIp_TcpHeader.TcpSrcDst->TcpDst & 0x00FF);
   /* Sequence Number  4 Byte */
-  McEthIp_TcpHeader[4] = (uint8)(McEthIp_TxHeader.TcpHeader->SeqNumber >> 24);
-  McEthIp_TcpHeader[5] = (uint8)(McEthIp_TxHeader.TcpHeader->SeqNumber >> 16);
-  McEthIp_TcpHeader[6] = (uint8)(McEthIp_TxHeader.TcpHeader->SeqNumber >> 8);
-  McEthIp_TcpHeader[7] = (uint8)(McEthIp_TxHeader.TcpHeader->SeqNumber & 0x00FF);
+  McEthIp_TcpHeaderTemp[4] = (uint8)(McEthIp_TcpHeader.SeqNumber >> 24);
+  McEthIp_TcpHeaderTemp[5] = (uint8)(McEthIp_TcpHeader.SeqNumber >> 16);
+  McEthIp_TcpHeaderTemp[6] = (uint8)(McEthIp_TcpHeader.SeqNumber >> 8);
+  McEthIp_TcpHeaderTemp[7] = (uint8)(McEthIp_TcpHeader.SeqNumber & 0x00FF);
   /* Aknowledgment Number  4 Bytes */
-  McEthIp_TcpHeader[8] = (uint8)(McEthIp_TxHeader.TcpHeader->Aknowledgment >> 24);
-  McEthIp_TcpHeader[9] = (uint8)(McEthIp_TxHeader.TcpHeader->Aknowledgment >> 16);
-  McEthIp_TcpHeader[10] = (uint8)(McEthIp_TxHeader.TcpHeader->Aknowledgment >> 8);
-  McEthIp_TcpHeader[11] = (uint8)(McEthIp_TxHeader.TcpHeader->Aknowledgment & 0x00FF);
-  /* Data Offset 1 Byte */
-  McEthIp_TcpHeader[12] = McEthIp_TxHeader.TcpHeader->DataOffset;
-  /* Flags 1 Byte */
-  McEthIp_TcpHeader[13] = McEthIp_TxHeader.TcpHeader->Flags;
+  McEthIp_TcpHeaderTemp[8] = (uint8)(McEthIp_TcpHeader.Aknowledgment >> 24);
+  McEthIp_TcpHeaderTemp[9] = (uint8)(McEthIp_TcpHeader.Aknowledgment >> 16);
+  McEthIp_TcpHeaderTemp[10] = (uint8)(McEthIp_TcpHeader.Aknowledgment >> 8);
+  McEthIp_TcpHeaderTemp[11] = (uint8)(McEthIp_TcpHeader.Aknowledgment & 0x00FF);
+  /* Data Offset 4 Bits and flags by 4 bits*/
+  McEthIp_TcpHeaderTemp[12] = McEthIp_TcpHeader.DataOffsetAndFlags;
   /* Window Size 2 Bytes */
-  McEthIp_TcpHeader[14] = (uint8)(McEthIp_TxHeader.TcpHeader->WindowSize >> 8);
-  McEthIp_TcpHeader[15] = (uint8)(McEthIp_TxHeader.TcpHeader->WindowSize & 0x00FF);
+  McEthIp_TcpHeaderTemp[13] = (uint8)(McEthIp_TcpHeader.WindowSize >> 8);
+  McEthIp_TcpHeaderTemp[14] = (uint8)(McEthIp_TcpHeader.WindowSize & 0x00FF);
   /* CheckSum Is 0 for now 2 Bytes */
-  McEthIp_TcpHeader[16] = 0;
-  McEthIp_TcpHeader[17] = 0;
+  McEthIp_TcpHeaderTemp[15] = 0;
+  McEthIp_TcpHeaderTemp[16] = 0;
   /* UrgentPointer 2 Bytes */
-  McEthIp_TcpHeader[18] = (uint8)(McEthIp_TxHeader.TcpHeader->UrgentPointer >> 8);
-  McEthIp_TcpHeader[19] = (uint8)(McEthIp_TxHeader.TcpHeader->UrgentPointer & 0x00FF);
+  McEthIp_TcpHeaderTemp[17] = (uint8)(McEthIp_TcpHeader.UrgentPointer >> 8);
+  McEthIp_TcpHeaderTemp[18] = (uint8)(McEthIp_TcpHeader.UrgentPointer & 0x00FF);
 
-  McEthUpdateTcpCheckSum(McEthIp_TcpHeader, MCETHIP_HEADER_LEN);
+
+  /* Options are zero so we don't need them for now */
+  McEthIp_TcpHeaderTemp[19] = 0;
+
+  McEthIpUpdateTcpCheckSum(McEthIp_TcpHeaderTemp, MCETHIP_HEADER_LEN);
 
   /* CheckSum 2 Bytes */
-  McEthIp_TcpHeader[16] = (uint8)(McEthIp_TxHeader.TcpHeader->CheckSum >> 8);
-  McEthIp_TcpHeader[17] = (uint8)(McEthIp_TxHeader.TcpHeader->CheckSum & 0x00FF);
+  McEthIp_TcpHeaderTemp[15] = (uint8)(McEthIp_TcpHeader.CheckSum >> 8);
+  McEthIp_TcpHeaderTemp[16] = (uint8)(McEthIp_TcpHeader.CheckSum & 0x00FF);
 
   /* Push Tcp Header to buffer */
-  if (McEth_PushTransmitMessage(McEthIp_TcpHeader, MCETHIP_HEADER_LEN))
+  if (McEth_PushTransmitMessage(McEthIp_TcpHeaderTemp, MCETHIP_HEADER_LEN))
   {
     /* Ok */
   }
@@ -238,8 +301,11 @@ static void McEth_CreateTcpHeader(uint16 PayloadSize)
   {
     /* Buffer is full */
   }
-
-  McEthIp_TxHeader.TcpHeader->SeqNumber++;
+  /* Prepare Aknowledgment for the receive Packet */
+  McEthIp_TcpHeader.Aknowledgment = ((0xFFFFFFFF - McEthIp_TcpHeader.SeqNumber) > PayloadSize) ? (0xFFFFFFFF- McEthIp_TcpHeader.SeqNumber + PayloadSize) : (McEthIp_TcpHeader.SeqNumber + PayloadSize);
+  /* Increase SeqNumber for the next packet */
+  McEthIp_TcpHeader.SeqNumber = ((0xFFFFFFFF - McEthIp_TcpHeader.SeqNumber) > PayloadSize) ? (0xFFFFFFFF- McEthIp_TcpHeader.SeqNumber + PayloadSize) : (McEthIp_TcpHeader.SeqNumber + PayloadSize);
+  /* Message will be pushed with checksum of tcp for now Write value of CheckSum will be stored for future use */
 }
 
 
@@ -248,7 +314,7 @@ static void McEth_CreateTcpHeader(uint16 PayloadSize)
  * \param McEth_SendPayload
  * \return void
  */
-static void McEth_SendPayload(uint8* DataPayload, uint16 PayloadSize)
+static void McEthIp_CreatePayload(uint8* DataPayload, uint16 PayloadSize)
 {
   uint16 PayloadRemain = PayloadSize;
   uint16 counter = 128;
@@ -256,24 +322,25 @@ static void McEth_SendPayload(uint8* DataPayload, uint16 PayloadSize)
 
   while (PayloadRemain >= 128)
   {
-    Dma_SetSourceAddress (&McEthiIp_DmaPachetHandler, (uint32)&DataPayload[counter - 128]);
-    Dma_SetDestinationAddress(&McEthiIp_DmaPachetHandler, (uint32)&McEthIp_TransmitBuffer[0]);
-    Dma_Transfer(&McEthiIp_DmaPachetHandler);
-    McEthUpdateTcpCheckSum(McEthIp_TransmitBuffer, MCETHIP_DATASIZE);
+    Dma_SetSourceAddress (&McEthIp_DmaTransmitPachetHandler, (uint32)&DataPayload[counter - 128]);
+    Dma_SetDestinationAddress(&McEthIp_DmaTransmitPachetHandler, (uint32)&McEthIp_TransmitBuffer[0]);
+    Dma_Transfer(&McEthIp_DmaTransmitPachetHandler);
+    McEthIpUpdateTcpCheckSum(McEthIp_TransmitBuffer, MCETHIP_DATASIZE);
     McEth_PushTransmitMessage(McEthIp_TransmitBuffer, MCETHIP_DATASIZE);
     PayloadRemain -= 128;
     /* Multiply by 2 */
-    counter<<=1;
+    counter+=128;
   }
 
   if (PayloadRemain > 0)
   {
-    IfxDma_Dma_setChannelTransferCount(&McEthiIp_DmaPachetHandler, PayloadRemain);
-    Dma_SetSourceAddress (&McEthiIp_DmaPachetHandler, (uint32)&DataPayload[counter]);
-    Dma_SetDestinationAddress(&McEthiIp_DmaPachetHandler, (uint32)&McEthIp_TransmitBuffer[0]);
-    Dma_Transfer(&McEthiIp_DmaPachetHandler);
-    McEthUpdateTcpCheckSum(McEthIp_TransmitBuffer, PayloadRemain);
+    IfxDma_Dma_setChannelTransferCount(&McEthIp_DmaTransmitPachetHandler, PayloadRemain);
+    Dma_SetSourceAddress (&McEthIp_DmaTransmitPachetHandler, (uint32)&DataPayload[counter]);
+    Dma_SetDestinationAddress(&McEthIp_DmaTransmitPachetHandler, (uint32)&McEthIp_TransmitBuffer[0]);
+    Dma_Transfer(&McEthIp_DmaTransmitPachetHandler);
+    McEthIpUpdateTcpCheckSum(McEthIp_TransmitBuffer, PayloadRemain);
     McEth_PushTransmitMessage(McEthIp_TransmitBuffer, PayloadRemain);
+    IfxDma_Dma_setChannelTransferCount(&McEthIp_DmaTransmitPachetHandler, MCETHIP_DATASIZE);
 
   }
   else
@@ -282,8 +349,9 @@ static void McEth_SendPayload(uint8* DataPayload, uint16 PayloadSize)
   }
   /* Update the checksum in the checksum area of the transmit memory */
   /* CheckSum 2 Bytes */
-  NewCheckSum[0] = (uint8)(McEthIp_TxHeader.TcpHeader->CheckSum >> 8);
-  NewCheckSum[1] = (uint8)(McEthIp_TxHeader.TcpHeader->CheckSum & 0x00FF);
+  McEthIp_TcpHeader.CheckSum = ~McEthIp_TcpHeader.CheckSum;
+  NewCheckSum[0] = (uint8)(McEthIp_TcpHeader.CheckSum >> 8);
+  NewCheckSum[1] = (uint8)(McEthIp_TcpHeader.CheckSum & 0x00FF);
   McEth_WriteTransmitMemory(McEthIp_TransmitTcpChecksum, NewCheckSum, sizeof(NewCheckSum));
 }
 
@@ -293,7 +361,7 @@ static void McEth_SendPayload(uint8* DataPayload, uint16 PayloadSize)
  * \param McEthIp_InitTcpTransmitPacket
  * \return void
  */
-void McEthIp_InitTcpTransmitPacket(uint8* DstMacAddress ,MCETHIP_IP* IpAddress, uint8* DataPayload, uint16 PayloadSize)
+void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize)
 {
   uint8 Ipv4Type[2] = {0x08, 0x00};
   switch (McEthIp_TransmitState)
@@ -303,34 +371,272 @@ void McEthIp_InitTcpTransmitPacket(uint8* DstMacAddress ,MCETHIP_IP* IpAddress, 
       break;
 
     case SEND_ETHERNET_HEADER:
-      McEth_CreateTransmitPacket(DstMacAddress, Ipv4Type);
+      McEth_CreateTransmitPacket(Ipv4Type);
       McEthIp_TransmitState = SEND_IP_HEADER;
       break;
 
     case SEND_IP_HEADER:
-      McEth_CreateIpHeader(IpAddress, PayloadSize);
+      McEthIp_CreateIpHeader(PayloadSize);
       McEthIp_TransmitState = SEND_TCP_HEADER;
       break;
     case SEND_TCP_HEADER:
-      McEth_CreateTcpHeader(PayloadSize);
+      McEthIp_CreateTcpHeader(PayloadSize);
       McEthIp_TransmitState = SEND_PAYLOAD;
       break;
 
     case SEND_PAYLOAD:
-      McEth_SendPayload(DataPayload, PayloadSize);
+      McEthIp_CreatePayload(DataPayload, PayloadSize);
+      McEthIp_TransmitState = SEND_PACKET;
+      break;
+
+    case SEND_PACKET:
       /* Send the message */
       if (McEth_TransmitMessage())
       {
-        McEthIp_TransmitState = ETH_TRANSMIT_VALIDATE;
+        McEthIp_TransmitState = ETH_TRANSMIT_IDLE;
       }
       else
       {
 
-        McEthIp_TransmitState = ETH_TRANSMIT_IDLE;
+        /* Wait till the message is sent */
       }
       break;
     default:
       break;
+  }
+}
+
+
+
+/** \brief Evaluates the IP Header
+ * \param McEthEvaluateIpHeader
+ * \return boolean
+ */
+static boolean McEthIpEvaluateIpHeader(void)
+{
+  boolean success = TRUE;
+
+  uint8 IpHeader_tmp[MCETHIP_HEADER_LEN];
+
+  McEth_ReadReceivedBytes(IpHeader_tmp, MCETHIP_HEADER_LEN);
+
+  /* Header length and type */
+  if (((IpHeader_tmp[0] >> 4) != 0x4) || ((IpHeader_tmp[0] & 0x0F) < 0x05))
+  {
+    return FALSE;
+  }
+
+  /* Header time to live greater than 0 */
+  if (IpHeader_tmp[8] == 0)
+  {
+    return FALSE;
+  }
+
+  /* Header protocol is TCP */
+  if (IpHeader_tmp[9] != 0x06)
+  {
+    return FALSE;
+  }
+
+  /* Destination Address should be equal with the Module's IP address */
+  for (uint8 i = 0; i < 4; i++)
+  {
+    if (IpHeader_tmp[16 + i] != McEthIp_IpHeader.SrcDstIpAddress->IpSrcAddress[i])
+    {
+      success = FALSE;
+      break;
+    }
+  }
+
+  if (success == FALSE)
+  {
+    return FALSE;
+  }
+
+  /* Store the CheckSum to evaluation */
+  uint16 CheckSum = (uint16)((IpHeader_tmp[10] << 8) | (IpHeader_tmp[11] & 0x00FF));
+  /* Set CheckSum to 0 in the array in order to recalculate it */
+  IpHeader_tmp[10] = 0;
+  IpHeader_tmp[11] = 0;
+
+  /* Check the checksum */
+  if (McEthIpCheckSumCalc(IpHeader_tmp, 20) != CheckSum)
+  {
+    return FALSE;
+  }
+
+  /* Check The remaining Length */
+  uint16 message_Size = (uint16)((IpHeader_tmp[2] << 8) | (IpHeader_tmp[3] & 0x00FF));
+  message_Size -= 20;
+  if (McEth_ReceiveBytesNum != message_Size)
+  {
+    return FALSE;
+  }
+
+  /* Update the destination address for the next transmit message */
+  for (uint8 i = 0; i< 4; i++)
+  {
+    McEthIp_IpHeader.SrcDstIpAddress->IpDstAddress[i] = IpHeader_tmp[12 + i];
+  }
+
+  uint8 RemainIpHeaderLen  = (IpHeader_tmp[0] & 0x0F) * 4 - MCETHIP_HEADER_LEN;
+
+  if (RemainIpHeaderLen > 0)
+  {
+    /* Remove the remaining ip header bytes to move to the next step */
+    McEth_ReadReceivedBytes(IpHeader_tmp, RemainIpHeaderLen);
+  }
+
+  return success;
+}
+
+
+
+/** \brief Evaluates the TCP Header
+ * \param McEthEvaluateTcpHeader
+ * \return boolean
+ */
+static boolean McEthIpEvaluateTcpHeader(void)
+{
+  boolean success = TRUE;
+
+  uint8 TcpHeader_tmp[MCETHIP_HEADER_LEN];
+
+  /* We suppose that options field does not exist */
+  McEth_ReadReceivedBytes(TcpHeader_tmp, MCETHIP_HEADER_LEN);
+
+  uint16 DstAddr = (uint16)((TcpHeader_tmp[2] << 8) | (TcpHeader_tmp[3] & 0x00FF));
+
+  /* Check Dst Addr if its the correct one */
+  if (DstAddr != McEthIp_TcpHeader.TcpSrcDst->TcpSrc)
+  {
+    return FALSE;
+  }
+
+  /* Check the aknowledgment */
+  uint32 Aknowledgment = (uint32) ((TcpHeader_tmp[8] << 24) | (TcpHeader_tmp[9] << 16) | (TcpHeader_tmp[10] << 8) | (TcpHeader_tmp[11]));
+
+  if (Aknowledgment != McEthIp_TcpHeader.Aknowledgment)
+  {
+    return FALSE;
+  }
+
+  /* Update the Dst Address */
+  McEthIp_TcpHeader.TcpSrcDst->TcpDst = (uint16)((TcpHeader_tmp[0] << 8) | (TcpHeader_tmp[1] & 0x00FF));
+
+  /* Get Sequence number */
+  uint32 SeqNum = (uint32) ((TcpHeader_tmp[4] << 24) | (TcpHeader_tmp[5] << 16) | (TcpHeader_tmp[6] << 8) | (TcpHeader_tmp[7]));
+  /* McEth_ReceiveBytesNum are updated in lower layer */
+  McEthIp_TcpHeader.Aknowledgment = McEth_ReceiveBytesNum + SeqNum;
+
+
+  /* Get the length of TcpHeader */
+  uint8 TcpHeadLen = (McEthIp_TcpHeader.DataOffsetAndFlags >> 4) * 4;
+  if (TcpHeadLen > MCETHIP_HEADER_LEN)
+  {
+    /* Get the remaining header bytes tbd include the options inside */
+    McEth_ReadReceivedBytes(TcpHeader_tmp, TcpHeadLen - MCETHIP_HEADER_LEN);
+  }
+  else if (TcpHeadLen < 20)
+  {
+    /* Invalid number of bytes in tcp something is not correct here */
+    return FALSE;
+  }
+
+  return success;
+}
+
+
+
+/** \brief Reads the Payload of the TCP packet
+ * \param McEthReadPayload
+ * \return boolean
+ */
+void McEthIpReadPayload(void)
+{
+  McEthIp_Payload.ReadBufferSize = (McEth_ReceiveBytesNum - 4);
+  while(McEth_ReceiveBytesNum > 128)
+  {
+    McEth_ReadReceivedPayload(&McEth_Buf[McEthIp_Payload.ReadPayloadIndex], 128);
+  }
+
+  if (McEth_ReceiveBytesNum > 0)
+  {
+    McEth_ReadReceivedPayload(&McEth_Buf[McEthIp_Payload.ReadPayloadIndex], McEth_ReceiveBytesNum);
+  }
+  McEthIp_Payload.WritePayloadIndex = (McEthIp_Payload.ReadPayloadIndex + 1) % MC_ETHERNET_MAXFRAME;
+}
+
+
+
+/** \brief Receives and evaluates a TCP packet
+ * \param McEthIp_InitTcpReceivePacket
+ * \return void
+ */
+void McEthIp_TcpReceivePacket(void)
+{
+  switch (McEthIp_ReceiveState)
+  {
+    case ETH_RECEIVE_IDLE:
+      if (McEth_ReceiveMsg(100))
+      {
+        McEthIp_ReceiveState = READ_ETHERNET_HEADER;
+      }
+      else
+      {
+        McEthIp_ReceiveState = ETH_RECEIVE_IDLE;
+      }
+      break;
+
+    case READ_ETHERNET_HEADER:
+      McEth_ReadEthernetProperties();
+      /* Check that type length is IPV4 */
+      if (McEth_ReturnReceiveType()==0x800)
+      {
+        McEthIp_ReceiveState = READ_IP_HEADER;
+      }
+      else
+      {
+        McEth_ResetReceiveBuffer();
+        McEthIp_ReceiveState = ETH_RECEIVE_FAIL;
+      }
+      break;
+
+    case READ_IP_HEADER:
+      if (McEthIpEvaluateIpHeader())
+      {
+        McEthIp_ReceiveState = READ_TCP_HEADER;
+      }
+      else
+      {
+        McEth_ResetReceiveBuffer();
+        McEthIp_ReceiveState = ETH_RECEIVE_FAIL;
+      }
+      break;
+
+    case READ_TCP_HEADER:
+      if (McEthIpEvaluateTcpHeader())
+      {
+        McEthIpReadPayload();
+        McEthIp_ReceiveState = READ_PAYLOAD;
+      }
+      else
+      {
+        McEth_ResetReceiveBuffer();
+        McEthIp_ReceiveState = ETH_RECEIVE_FAIL;
+      }
+      break;
+
+    case READ_PAYLOAD:
+      /* Success now read the Payload by higher layer */
+      break;
+
+    case ETH_RECEIVE_FAIL:
+      break;
+
+    default:
+      break;
+
   }
 
 }
@@ -341,7 +647,7 @@ void McEthIp_InitTcpTransmitPacket(uint8* DstMacAddress ,MCETHIP_IP* IpAddress, 
  * \param McEthUpdateCheckSum
  * \return void
  */
-static inline void McEthUpdateIpCheckSum(uint8* McEthIp_IpHeader)
+static void McEthIpUpdateIpCheckSum(uint8* McEthIp_IpHeader)
 {
   uint32 CheckSum = 0;
   uint16 tmp;
@@ -360,14 +666,15 @@ static inline void McEthUpdateIpCheckSum(uint8* McEthIp_IpHeader)
   McEthIp_IpHeader[11] = (uint8)(~CheckSum & 0x00FF);
 }
 
+
+
 /** \brief Calculate CheckSum of the Tcp Header
  * \param McEthUpdateTcpCheckSum
  * \return void
  */
-
-static inline void McEthUpdateTcpCheckSum(uint8* BytesArray, uint16 size)
+static void McEthIpUpdateTcpCheckSum(uint8* BytesArray, uint16 size)
 {
-  uint32 CheckSum = (uint32)McEthIp_TxHeader.TcpHeader->CheckSum;
+  uint32 CheckSum = (uint32)McEthIp_TcpHeader.CheckSum;
   for  (uint16 i = 0; i < size; i++)
   {
     CheckSum += BytesArray[i];
@@ -377,7 +684,220 @@ static inline void McEthUpdateTcpCheckSum(uint8* BytesArray, uint16 size)
       CheckSum = (CheckSum & 0xFFFF) + 1;
     }
   }
-  McEthIp_TxHeader.TcpHeader->CheckSum = (uint16)CheckSum;
+  McEthIp_TcpHeader.CheckSum = (uint16)CheckSum;
 }
 
+
+
+/** \brief Calculate CheckSum of a message
+ * \param McEthCheckSumCalc
+ * \return void
+ */
+static uint16 McEthIpCheckSumCalc(uint8* BytesArray, uint16 size)
+{
+  uint16 CheckSum = 0;
+  for  (uint16 i = 0; i < size; i++)
+  {
+    CheckSum += BytesArray[i];
+
+    if (CheckSum > 0xFFFF)
+    {
+      CheckSum = (CheckSum & 0xFFFF) + 1;
+    }
+  }
+  return CheckSum;
+}
+
+
+
+/** \brief Creates an ARP packet
+ * \param McEthIp_CreateARP function
+ * \return boolean
+ */
+static boolean McEthIp_CreateARP(uint8* DstIpAddress)
+{
+  uint8 ArpType[2] = {0x08, 0x06};
+  uint8 ArpPacket[MCETHIP_ARP_PACKETLEN];
+  uint8 MacAddrs[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+  /* Prepare the Dst Ip Address */
+  McEthIp_SetDstIpAddress(DstIpAddress);
+
+  /* Create an Ethernet Header Packet */
+  McEth_CreateTransmitPacket(ArpType);
+
+  /* Hardware Type */
+  ArpPacket[0] = 0x00;
+  ArpPacket[1] = 0x01;
+
+  /* Protocol Type IpV4 */
+  ArpPacket[2] = 0x08;
+  ArpPacket[3] = 0x00;
+
+  /* Header length 6 bytes */
+  ArpPacket[4] = 0x06;
+
+  /* Protocol Address bytes 4 */
+  ArpPacket[5] = 0x04;
+
+  /* Operation */
+  ArpPacket[6] = 0x00;
+  ArpPacket[7] = 0x01;
+
+  /* Src Mac Address */
+  McEth_GetSrcMacAddress(&ArpPacket[8]);
+
+  /* Src Ip Address */
+  McEthIp_GetSrcIpAddress(&ArpPacket[14]);
+
+  /* Dst Mac Address */
+  McEth_SetDstMacAddress(MacAddrs);
+  McEth_GetDstMacAddress(&ArpPacket[18]);
+
+  /* Dst Ip Address */
+  McEthIp_GetDstIpAddress(&ArpPacket[24]);
+
+  if (!McEth_PushTransmitMessage(ArpPacket, sizeof(ArpPacket)))
+  {
+    return FALSE;
+  }
+  else
+  {
+    return TRUE;
+  }
+}
+
+
+
+/** \brief Sends a ARP packet
+ * \param McEthIp_SendARP function
+ * \return boolean
+ */
+void McEthIp_SendARP(uint8* DstIpAddress)
+{
+  switch (McEthIp_SendARPState)
+  {
+    case ETH_CREATE_ARP:
+      if (McEthIp_CreateARP(DstIpAddress))
+      {
+        McEthIp_SendARPState = ETH_SEND_ARP;
+      }
+      else
+      {
+        McEthIp_SendARPState = ETH_CREATE_ARP;
+      }
+      break;
+
+    case ETH_SEND_ARP:
+      if (McEth_TransmitMessage())
+      {
+        McEthIp_SendARPState = ETH_SUCCESSSEND_ARP;
+      }
+      else
+      {
+        McEthIp_SendARPState = ETH_FAILSEND_ARP;
+      }
+      break;
+
+    case ETH_FAILSEND_ARP:
+      break;
+
+    default:
+      break;
+  }
+}
+
+
+
+/** \brief Evaluates an ARP packet
+ * \param McEthIp_EvalARP  function
+ * \return boolean
+ */
+static boolean McEthIp_EvalARP(void)
+{
+  uint8 ArpPacket[MCETHIP_ARP_PACKETLEN];
+  uint8 MacAddr[MC_ETHERNET_MACSIZE];
+  boolean success = FALSE;
+
+  McEth_GetSrcMacAddress(MacAddr);
+
+  McEth_ReadReceivedBytes(ArpPacket, MCETHIP_ARP_PACKETLEN);
+  if (McEth_ReceiveBytesNum < 28)
+  {
+    success = FALSE;
+  }
+
+  if (McEth_ReturnReceiveType()!=0x800)
+  {
+    success = FALSE;
+  }
+
+  if ((ArpPacket[0] != 0x00) || (ArpPacket[1] != 0x01))
+  {
+    success = FALSE;
+  }
+
+  if ((ArpPacket[6] != 0x00) || (ArpPacket[7] != 0x02))
+  {
+    success = FALSE;
+  }
+
+  for (uint8 i = 9; i< MCETHIP_HEADER_LEN; i++)
+  {
+    if (McEthIp_TxSrcIpAddress[i] != ArpPacket[24 + i])
+    {
+      success = FALSE;
+      break;
+    }
+  }
+
+  if (success == TRUE)
+  {
+    McEth_SetDstMacAddress(&ArpPacket[8]);
+    return success;
+  }
+  else
+  {
+    return success;
+  }
+}
+
+void McEthIp_GetARP(void)
+{
+  switch(McEthIp_GetARPState)
+  {
+    case ETH_GET_ARP:
+      if (McEth_ReceiveMsg(100))
+      {
+        McEth_ReadEthernetProperties();
+        McEthIp_GetARPState = ETH_EVAL_ARP;
+      }
+      else
+      {
+        McEthIp_GetARPState = ETH_GET_ARP;
+      }
+      break;
+
+    case ETH_EVAL_ARP:
+      if (McEthIp_EvalARP())
+      {
+        McEth_ResetReceiveBuffer();
+        McEthIp_GetARPState = ETH_SUCCESSRECEIVE_ARP;
+      }
+      else
+      {
+        McEthIp_GetARPState = ETH_FAIRECEIVE_ARP;
+      }
+      break;
+
+    case  ETH_SUCCESSRECEIVE_ARP:
+      break;
+
+    case  ETH_FAIRECEIVE_ARP:
+      break;
+
+    default:
+      break;
+  }
+}
 

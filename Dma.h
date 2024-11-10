@@ -51,7 +51,7 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress);
+void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority);
 void Dma_Transfer(IfxDma_Dma_Channel* DmaChannel);
 void Dma_SetSourceAddress(IfxDma_Dma_Channel* DmaChannel,  uint32 SourceAddress);
 void Dma_SetDestinationAddress(IfxDma_Dma_Channel* DmaChannel,  uint32 DestinationAddress);

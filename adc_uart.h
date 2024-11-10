@@ -65,7 +65,7 @@ void UartWriteWithChar(uint8 *message,Ifx_SizeT length,char special_char);
 void UartRstRxBuffer(void);
 uint8 Get_UsbRxBufferIndex(Ifx_SizeT index);
 /* Group Scan Adc functions */
-void init_vadc_group(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup,uint8 channels_size);
+void Adc_InitGroup(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup,uint8 channels_size);
 void run_vadc_group(uint32 channels);
 void Adc_ReadGroup(uint32* ChannelsRes ,uint8 channels);
 void send_vadc_group(uint32 chnIx, uint32 adcVal);

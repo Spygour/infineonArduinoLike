@@ -35,12 +35,6 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-typedef struct MCETH_IP_NODE
-{
-    uint8* PacketMessage;
-    uint8  PacketSize;
-    struct ETHERNET_IP_NODE *NextNode;
-}MCETH_IP_NODE;
 
 typedef enum
 {
@@ -49,7 +43,7 @@ typedef enum
   SEND_IP_HEADER,
   SEND_TCP_HEADER,
   SEND_PAYLOAD,
-  ETH_TRANSMIT_VALIDATE
+  SEND_PACKET
 }MCETH_IP_TRANSMIT_STATE;
 
 typedef enum
@@ -59,53 +53,79 @@ typedef enum
   READ_IP_HEADER,
   READ_TCP_HEADER,
   READ_PAYLOAD,
-  ETH_RECEIVE_VALIDATE
+  ETH_RECEIVE_FAIL
 }MCETH_IP_RECEIVE_STATE;
 
-typedef struct
-{
-    uint8*        McEthIp_SrcAddress;
-    uint8*        McEthIp_DstAddress;
-}MCETHIP_IP;
 
-typedef struct
+typedef enum
 {
-    uint8      Version_HeaderLength;
-    uint8      DifferecialServices;
-    uint16     TotalLength;
-    uint16     Identification;
-    uint16     FragmentOffset;
-    uint8      TimeToLive;
-    uint8      Protocol;
-    uint16     CheckSum;
-    MCETHIP_IP *SrcDstIpAddress;
-}MCETH_IPHEADER;
+  ETH_CREATE_ARP,
+  ETH_SEND_ARP,
+  ETH_FAILSEND_ARP,
+  ETH_SUCCESSSEND_ARP
+}MCETHIP_ARP_TRANSMIT_STATE;
 
-typedef struct
+
+typedef enum
 {
-   uint16  SrcPort;
-   uint16  DstPort;
-   uint32  SeqNumber;
-   uint32  Aknowledgment;
-   uint8   DataOffset;
-   uint8   Flags;
-   uint16  WindowSize;
-   uint16  CheckSum;
-   uint16  UrgentPointer;
-   uint16  Options;
-}MCETH_TCPHEADER;
+  ETH_GET_ARP,
+  ETH_EVAL_ARP,
+  ETH_FAIRECEIVE_ARP,
+  ETH_SUCCESSRECEIVE_ARP
+}MCETHIP_ARP_RECEIVE_STATE;
 
 typedef struct
 {
-    MCETH_IPHEADER* IpHeader;
-    MCETH_TCPHEADER* TcpHeader;
-}MCETH_HEADER;
+    uint8*        IpSrcAddress;
+    uint8*        IpDstAddress;
+}MCETHIP_IP_ADDRESS;
 
+typedef struct
+{
+    uint16       TcpSrc;
+    uint16       TcpDst;
+}MCETHIP_TCP_ADDRESS;
 
+typedef struct
+{
+    MCETHIP_IP_ADDRESS   *SrcDstIpAddress;
+    uint8                Version_HeaderLength;
+    uint8                DifferecialServices;
+    uint16               TotalLength;
+    uint16               Identification;
+    uint16               FragmentOffset;
+    uint8                TimeToLive;
+    uint8                Protocol;
+    uint16               CheckSum;
+}MCETHIP_IPHEADER;
+
+typedef struct
+{
+   MCETHIP_TCP_ADDRESS*  TcpSrcDst;
+   uint32                SeqNumber;
+   uint32                Aknowledgment;
+   uint8                 DataOffsetAndFlags;
+   uint16                WindowSize;
+   uint16                CheckSum;
+   uint16                UrgentPointer;
+}MCETHIP_TCPHEADER;
+
+typedef struct MCETHIP_PAYLOAD
+{
+    uint16  WritePayloadIndex;
+    uint16  ReadPayloadIndex;
+    uint8*  Buffer;
+    uint16  WriteBufferSize;
+    uint16  ReadBufferSize;
+}MCETHIP_PAYLOAD;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
-
+extern MCETH_IP_TRANSMIT_STATE McEthIp_TransmitState;
+extern MCETH_IP_RECEIVE_STATE McEthIp_ReceiveState;
+extern MCETHIP_ARP_TRANSMIT_STATE McEthIp_SendARPState;
+extern MCETHIP_ARP_TRANSMIT_STATE McEthIp_GetARPState ;
+extern MCETHIP_PAYLOAD McEthIp_Payload;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -117,5 +137,13 @@ typedef struct
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
+void McEthIp_Init(uint8* SrcMacAddress);
+void McEthIp_SetSrcIpAddress(uint8* IpAddress);
+void McEthIp_SetDstIpAddress(uint8* IpAddress);
+void McEthIp_GetSrcIpAddress(uint8* ptr);
+void McEthIp_GetDstIpAddress(uint8* ptr);
+void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize);
+void McEthIp_TcpReceivePacket(void);
+
 
 #endif /* INFINEONARDUINOLIKE_McEthIP_H_ */

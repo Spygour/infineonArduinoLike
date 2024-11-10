@@ -33,11 +33,10 @@
 #include "Spi.h"
 #include "pinsReadWrite.h"
 #include "Bsp.h"
-
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define MC_ETHERNET_MAXFRAME     1500
+#define DMA_ETHRECEIVEPRIORITY   4
 #define MC_ETHERNET_RESET        &MODULE_P33,10
 #define MC_ETHERNET_SPIBAUDRATE  10000000
 #define MC_ETHERNET_WRITECOMMAND 2
@@ -46,7 +45,6 @@
 #define MC_ETHERNET_READBUFFER   0x3A
 #define MC_ETHERNET_SETBIT       0x4
 #define MC_ETHERNET_CLEARBIT     0x5
-#define MC_ETHERNET_MACSIZE      6
 #define MC_ETHERNET_TYPESIZE     2
 #define BANK0                    0
 #define BANK1                    1
@@ -135,7 +133,9 @@ static uint8 McEth_TransmitStatusVector[7];
 static uint8 McEth_ReceiveStatusVector[4] = {0, 0, 0, 0};
 uint16 McEth_WriteAddress = 0;
 static uint16 McEth_ReadAddress = 0;
-static uint8 McEth_ReceiveBytesNum = 0;
+uint8 McEth_ReceiveBytesNum = 0;
+volatile uint16 McEth_WriteIndex = 0;
+volatile uint16 McEth_ReadIndex = 0;
 
 static MCETH_PACKET McEth_MasterPacketTransmit =
 {
@@ -157,7 +157,10 @@ static MCETH_PACKET McEth_MasterPacketReceive =
     RECEIVE_MESSAGE
 };
 
+IfxDma_Dma_Channel McEthiIp_DmaReceivePachetHandler;
+
 static uint8 McEth_RxBuffer[2];
+uint8 McEth_Buf[MC_ETHERNET_MAXFRAME];
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -169,6 +172,7 @@ static void McEth_WriteRegister(uint8 Register, uint8 Command);
 static uint8 McEth_ReadRegister(uint8 Register);
 static void McEth_WriteBuffer(uint8* Command, uint16 CommandSize);
 static void McEth_ReadBuffer(uint8* Result ,uint16 ResultSize);
+static void McEth_ReadPayload(uint16 ResultSize);
 static void McEth_SetBit(uint8 Register, uint8 Mask);
 static void McEth_ClearBit(uint8 Register, uint8 Mask);
 static void McEth_ReadTransmitStatusVector(void);
@@ -179,6 +183,25 @@ static void McEth_SetBank(uint8 Bank);
 IFX_INTERRUPT(SpimasterTxMcEth, 0, 46);                  /* SPI Master ISR for transmit data         */
 IFX_INTERRUPT(SpimasterRxMcEth, 0, 47);                  /* SPI Master ISR for receive data          */
 IFX_INTERRUPT(SpimasterErMcEth, 0, 48);                 /* SPI Master ISR for error                 */
+
+
+/** \brief Isr function for the interrupt after the successfull reception
+ * \param McEth_DmaReceiveIsr interrupt receive function
+ * \return None
+ */
+IFX_INTERRUPT(McEth_DmaReceiveIsr, 0, DMA_ETHRECEIVEPRIORITY);
+void McEth_DmaReceiveIsr(void)
+{
+    if (McEth_ReceiveBytesNum > 128)
+    {
+      McEth_ReadIndex = (McEth_ReadIndex + 128) % MC_ETHERNET_MAXFRAME;
+    }
+    else
+    {
+      McEth_ReadIndex = (McEth_ReadIndex + McEth_ReceiveBytesNum) % MC_ETHERNET_MAXFRAME;
+    }
+     /* It goes inside no need to do anything yet */
+}
 
 
  void SpimasterTxMcEth(void)
@@ -208,6 +231,10 @@ IFX_INTERRUPT(SpimasterErMcEth, 0, 48);                 /* SPI Master ISR for er
  */
 void McEth_Init(uint8* MacAddress)
 {
+  McEthiIp_DmaReceivePachetHandler.channelId = IfxDma_ChannelId_1;
+  /* Initialize the Source and Destination to be the same  then it will change in the next transaction */
+  Dma_Init(&McEthiIp_DmaReceivePachetHandler, 128, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETHRECEIVEPRIORITY);
+
   uint8 tmp;
   Ifx_TickTime delay100ms = IfxStm_getTicksFromMilliseconds(BSP_DEFAULT_TIMER,100);
   Ifx_TickTime delay1ms = IfxStm_getTicksFromMilliseconds(BSP_DEFAULT_TIMER,1);
@@ -293,7 +320,7 @@ void McEth_Init(uint8* MacAddress)
   McEth_WriteRegister(MAIPGL, 0x12);
   McEth_WriteRegister(MAIPGH, 0xC0);
 
-  McEth_SetMacAddress(MacAddress);
+  McEth_SetSrcMacAddress(MacAddress);
 
   /* Auto increment of buffer pointer */
   McEth_WriteRegister(ECON2, 0x80);
@@ -303,10 +330,10 @@ void McEth_Init(uint8* MacAddress)
 
 /** \brief Update internal data when incremental mode is using T2.\n
  * This function set ups the mac address
- * \param McEth_SetMacAddress configuration setup function
+ * \param McEth_SetSrcMacAddress configuration setup function
  * \return None
  */
-void McEth_SetMacAddress(uint8* MacAddress)
+void McEth_SetSrcMacAddress(uint8* MacAddress)
 {
   uint8 tmp;
   for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
@@ -327,12 +354,54 @@ void McEth_SetMacAddress(uint8* MacAddress)
 
 
 
+/** \brief Returns the Mac Address to a specific position of an array
+ * \param McEth_GetSrcMacAddress
+ * \return None
+ */
+void McEth_GetSrcMacAddress(uint8* ptr)
+{
+  for (uint8  i = 0; i < MC_ETHERNET_MACSIZE; i++)
+  {
+    ptr[i] =  McEth_MasterPacketTransmit.SrcMacAddress[i];
+  }
+}
+
+
+
+/** \brief Sets the DstMacAddress
+ * \param McEth_SetDstMacAddress
+ * \return None
+ */
+void McEth_SetDstMacAddress(uint8* MacAddress)
+{
+  for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
+  {
+    McEth_MasterPacketTransmit.DstMacAddress[i] = MacAddress[i];
+  }
+}
+
+
+
+/** \brief Gets the DstMacAddress
+ * \param McEth_GetDstMacAddress
+ * \return None
+ */
+void McEth_GetDstMacAddress(uint8* ptr)
+{
+  for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
+  {
+     ptr[i] = McEth_MasterPacketTransmit.DstMacAddress[i];
+  }
+}
+
+
+
 /** \brief Creates a simple ethernet packet
  * This function creates the main Transmit Packet Structure
  * \param McEth_CreateTransmitPacket configuration setup function
  * \return void
  */
-void McEth_CreateTransmitPacket(uint8* DstMacAddress, uint8* Type)
+void McEth_CreateTransmitPacket(uint8* Type)
 {
   uint16 EndAddress;
   static uint8 MessagePacket[MC_ETHERNET_MACSIZE];
@@ -351,17 +420,10 @@ void McEth_CreateTransmitPacket(uint8* DstMacAddress, uint8* Type)
   McEth_WriteRegister(ETXNDH, (uint8)(EndAddress >> 8));
 
 
-  for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
-  {
-    MessagePacket[i] = McEth_MasterPacketTransmit.DstMacAddress[i];
-  }
+  McEth_GetDstMacAddress(MessagePacket);
   McEth_WriteBuffer(MessagePacket, MC_ETHERNET_MACSIZE);
 
-  for (uint8 i = 0; i < MC_ETHERNET_MACSIZE; i++)
-  {
-    McEth_MasterPacketTransmit.DstMacAddress[i] = DstMacAddress[i];
-    MessagePacket[i] = McEth_MasterPacketTransmit.SrcMacAddress[i];
-  }
+  McEth_GetSrcMacAddress(MessagePacket);
   McEth_WriteBuffer(MessagePacket, MC_ETHERNET_MACSIZE);
 
   McEth_MasterPacketTransmit.TypeLength[0] = Type[0];
@@ -476,7 +538,7 @@ static void McEth_ReadTransmitStatusVector(void)
  * \param McEthernert_ReceiveMsg read function
  * \return boolean
  */
-boolean McEthernert_ReceiveMsg(float32 time)
+boolean McEth_ReceiveMsg(float32 time)
 {
   uint64 stmTickTimeInit = IfxStm_get(&MODULE_STM0);
   uint64 stmTickTimeAcl;
@@ -647,6 +709,17 @@ void McEth_ReadEthernetProperties(void)
 }
 
 
+/** \brief Reads the main properties of the received Packet
+ * This function reads the packet after successfull receive
+ * \param McEth_ReadEthernetProperties read function
+ * \return None
+ */
+uint16 McEth_ReturnReceiveType(void)
+{
+  uint16 TypeLength = (uint16)((McEth_MasterPacketReceive.TypeLength[0] << 8) | (McEth_MasterPacketReceive.TypeLength[1] & 0x00FF));
+  return TypeLength;
+}
+
 
 /** \brief Reads a specific length of bytes and stores to the ReceivePtr
  * This function reads the packet after receive alarm
@@ -661,6 +734,31 @@ void McEth_ReadReceivedBytes(uint8* ReceivePtr, uint16 ReceivePtrSize)
   }
   /* Read the Actual Packet */
   McEth_ReadBuffer(ReceivePtr, ReceivePtrSize);
+
+  McEth_ReceiveBytesNum -= ReceivePtrSize;
+}
+
+
+
+/** \brief Reads a specific length of bytes and stores to the ReceivePtr
+ * This function reads the packet after receive alarm
+ * \param McEth_ReadReceivedPayload read function
+ * \return None
+ */
+void McEth_ReadReceivedPayload(uint8* ReceivePtr, uint16 ReceivePtrSize)
+{
+  if (McEth_ReceiveBytesNum < ReceivePtrSize)
+  {
+    ReceivePtrSize = McEth_ReceiveBytesNum;
+  }
+  /* Read the Actual Packet */
+  McEth_ReadPayload(ReceivePtrSize);
+
+  IfxDma_Dma_setChannelTransferCount(&McEthiIp_DmaReceivePachetHandler, ReceivePtrSize);
+  /* We choose the next index since we don't read at the same time we write with SPI during the first byte */
+  Dma_SetSourceAddress (&McEthiIp_DmaReceivePachetHandler, Spi_ReturnSpiRxBufferAddr(1));
+  Dma_SetDestinationAddress(&McEthiIp_DmaReceivePachetHandler, (uint32)ReceivePtr);
+  Dma_Transfer(&McEthiIp_DmaReceivePachetHandler);
 
   McEth_ReceiveBytesNum -= ReceivePtrSize;
 
@@ -759,7 +857,7 @@ uint16 McEth_ReadWritePointer(void)
 /** \brief Update internal data when incremental mode is using T2.\n
  * This McEth Write Microchip Ethernet function
  * \param McEth_WriteRegister write function
- * \return boolean
+ * \return void
  */
 static void McEth_WriteRegister(uint8 Register, uint8 Command)
 {
@@ -772,7 +870,7 @@ static void McEth_WriteRegister(uint8 Register, uint8 Command)
 /** \brief Update internal data when incremental mode is using T2.\n
  * This McEth Reads Microchip Ethernet Register function
  * \param McEth_ReadRegister read function
- * \return boolean
+ * \return uint8
  */
 static uint8 McEth_ReadRegister(uint8 Register)
 {
@@ -781,35 +879,89 @@ static uint8 McEth_ReadRegister(uint8 Register)
   return McEth_RxBuffer[0];
 }
 
+
+
+/** \brief This McEth Reads Microchip Ethernet Register function
+ * \param McEth_WriteBuffer read function
+ * \return void
+ */
 static void McEth_WriteBuffer(uint8* Command, uint16 CommandSize)
 {
-  uint8 SpiBuffer[CommandSize+1];
+  if (CommandSize > 130)
+  {
+    return;
+  }
+  uint8 SpiBuffer[130];
   SpiBuffer[0] = MC_ETHERNET_WRITEBUFFER;
-  for(uint8 i = 0; i < CommandSize; i++)
+  for(uint16 i = 0; i < CommandSize; i++)
   {
     SpiBuffer[i+1] = Command[i];
   }
   Spi_WriteBytes(&McEthChannel, SpiBuffer, CommandSize+1);
 }
 
+
+
+/** \brief This McEth Reads Microchip Ethernet Register function and saves to spi buffer and then the spi buffer returns it to result
+ * \param McEth_WriteBuffer read function
+ * \return void
+ */
 static void McEth_ReadBuffer(uint8* Result ,uint16 ResultSize)
 {
+  if (ResultSize > 130)
+  {
+    return;
+  }
   uint8 SpiBuffer = MC_ETHERNET_READBUFFER;
   Spi_ReadBytes(&McEthChannel, &SpiBuffer, 1, Result, ResultSize);
 }
 
+
+
+/** \brief This McEth Reads Microchip Ethernet Register function and saves to spi buffer
+ * \param McEth_ReadPayload read function
+ * \return void
+ */
+static void McEth_ReadPayload(uint16 ResultSize)
+{
+  if (ResultSize > 130)
+  {
+    return;
+  }
+  uint8 SpiBuffer = MC_ETHERNET_READBUFFER;
+  Spi_ReadBuffer(&McEthChannel, &SpiBuffer, 1,ResultSize);
+}
+
+
+
+/** \brief This sets a specific bit in a register
+ * \param McEth_SetBit read function
+ * \return void
+ */
 static void McEth_SetBit(uint8 Register, uint8 Mask)
 {
   uint8 SpiBuffer[2] = {(MC_ETHERNET_SETBIT<<5)|Register, Mask};
   Spi_WriteBytes(&McEthChannel, SpiBuffer, 2);
 }
 
+
+
+/** \brief This clears a specific bit in a register
+ * \param McEth_ClearBit read function
+ * \return void
+ */
 static void McEth_ClearBit(uint8 Register, uint8 Mask)
 {
   uint8 SpiBuffer[2] = {(MC_ETHERNET_CLEARBIT<<5)|Register, Mask};
   Spi_WriteBytes(&McEthChannel, SpiBuffer, 2);
 }
 
+
+
+/** \brief This sets a specific bank of registers
+ * \param McEth_SetBank read function
+ * \return void
+ */
 static void McEth_SetBank(uint8 Bank)
 {
   uint8 ECON1reg = 0;

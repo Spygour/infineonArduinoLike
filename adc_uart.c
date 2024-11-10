@@ -82,7 +82,7 @@ void send_vadc_group(uint32 chnIx, uint32 adcVal);
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 /*vadc for many channels initialize and set part */
-void init_vadc_group(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup,uint8 channels_size)
+void Adc_InitGroup(IfxVadc_ChannelId * g_vadcChannelIDs, IfxVadc_GroupId adcGroup,uint8 channels_size)
 {
     /* Create and initialize the module configuration */
     IfxVadc_Adc_Config adcConf;                             /* Define a configuration structure for the VADC module */
@@ -186,7 +186,6 @@ void Adc_ReadGroup(uint32* ChannelsRes ,uint8 channels)
             conversionResult = IfxVadc_Adc_getResult(&g_adcChannel[chnIx]);
         } while(!conversionResult.B.VF); /* B for Bitfield access, VF for Valid Flag */
         ChannelsRes[chnIx] = conversionResult.B.RESULT;
-        /* Print the conversion to the UART */
     }
 }
 
