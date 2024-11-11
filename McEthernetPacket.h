@@ -38,7 +38,7 @@
 /*********************************************************************************************************************/
 #define MC_ETHERNET_MAXFRAME     1500
 #define MC_ETHERNET_MACSIZE      6
-#define MC_ETHERNET_DATASIZE     128
+#define MC_ETHERNET_DATASIZE     256
 
 typedef enum
 {
@@ -63,8 +63,8 @@ typedef struct
 extern uint16 McEth_WriteAddress;
 extern uint8 McEth_Buf[2048];
 extern uint8 McEth_ReceiveBytesNum;
-extern volatile uint16 McEth_WriteIndex;
-extern volatile uint16 McEth_ReadIndex;
+extern uint16 McEth_WriteIndex;
+extern uint16 McEth_ReadIndex;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/

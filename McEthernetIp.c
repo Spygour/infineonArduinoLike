@@ -84,11 +84,11 @@ MCETH_IP_RECEIVE_STATE McEthIp_ReceiveState = ETH_RECEIVE_IDLE;
 
 MCETHIP_PAYLOAD McEthIp_Payload =
 {
-    0,
-    0,
-    McEth_Buf,
-    0,
-    MC_ETHERNET_MAXFRAME
+    .ReadIndex = 0,
+    .WriteIndex = 0,
+    .Buffer = McEth_Buf,
+    .WriteBufferSize = 0,
+    .ReadBufferSize = MC_ETHERNET_MAXFRAME
 };
 
 static uint16 McEthIp_PayloadRemain;
@@ -116,7 +116,6 @@ static uint16 McEthIpCheckSumCalc(uint8* BytesArray, uint16 size);
  */
 void McEthIp_Init(uint8* SrcMacAddress)
 {
-
   McEth_Init(SrcMacAddress);
 }
 
@@ -302,11 +301,11 @@ static void McEthIp_CreatePayload(uint8* DataPayload, uint16 PayloadSize)
   McEthIp_Payload.WriteBufferSize = PayloadSize;
   uint8 NewCheckSum[2];
 
-  while (McEthIp_PayloadRemain >= 128)
+  while (McEthIp_PayloadRemain >= MC_ETHERNET_DATASIZE)
   {
     McEthIpUpdateTcpCheckSum(&DataPayload[McEth_WriteIndex], MC_ETHERNET_DATASIZE);
     McEth_PushTransmitPayload(&DataPayload[McEth_WriteIndex], MC_ETHERNET_DATASIZE);
-    McEthIp_PayloadRemain -= 128;
+    McEthIp_PayloadRemain -= MC_ETHERNET_DATASIZE;
   }
 
   if (McEthIp_PayloadRemain > 0)
@@ -364,16 +363,23 @@ void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize)
       /* Send the message */
       if (McEth_TransmitMessage())
       {
-        McEthIp_Payload.ReadIndex = McEth_ReadIndex;
         McEthIp_Payload.WriteIndex = McEth_WriteIndex;
-        McEthIp_TransmitState = ETH_TRANSMIT_IDLE;
+        McEthIp_Payload.ReadIndex = McEth_ReadIndex;
+        McEthIp_TransmitState = ETH_SEND_SUCCESS;
       }
       else
       {
-
+        McEthIp_TransmitState = ETH_SEND_FAIL;
         /* Wait till the message is sent */
       }
       break;
+
+    case ETH_SEND_SUCCESS:
+      break;
+
+    case ETH_SEND_FAIL:
+      break;
+
     default:
       break;
   }
@@ -528,9 +534,9 @@ static boolean McEthIpEvaluateTcpHeader(void)
 void McEthIpReadPayload(void)
 {
   McEthIp_Payload.ReadBufferSize = (McEth_ReceiveBytesNum - 4);
-  while(McEth_ReceiveBytesNum > 128)
+  while(McEth_ReceiveBytesNum > MC_ETHERNET_DATASIZE)
   {
-    McEth_ReadReceivedPayload(&McEth_Buf[McEth_ReadIndex], 128);
+    McEth_ReadReceivedPayload(&McEth_Buf[McEth_ReadIndex], MC_ETHERNET_DATASIZE);
   }
 
   if (McEth_ReceiveBytesNum > 0)
@@ -570,7 +576,7 @@ void McEthIp_TcpReceivePacket(void)
       else
       {
         McEth_ResetReceiveBuffer();
-        McEthIp_ReceiveState = ETH_RECEIVE_FAIL;
+        McEthIp_ReceiveState = ETH_READ_FAIL;
       }
       break;
 
@@ -582,7 +588,7 @@ void McEthIp_TcpReceivePacket(void)
       else
       {
         McEth_ResetReceiveBuffer();
-        McEthIp_ReceiveState = ETH_RECEIVE_FAIL;
+        McEthIp_ReceiveState = ETH_READ_FAIL;
       }
       break;
 
@@ -590,22 +596,22 @@ void McEthIp_TcpReceivePacket(void)
       if (McEthIpEvaluateTcpHeader())
       {
         McEthIpReadPayload();
-        McEthIp_Payload.ReadIndex = McEth_ReadIndex;
         McEthIp_Payload.WriteIndex = McEth_WriteIndex;
-        McEthIp_ReceiveState = READ_PAYLOAD;
+        McEthIp_Payload.ReadIndex = McEth_ReadIndex;
+        McEthIp_ReceiveState = ETH_READ_SUCCESS;
       }
       else
       {
         McEth_ResetReceiveBuffer();
-        McEthIp_ReceiveState = ETH_RECEIVE_FAIL;
+        McEthIp_ReceiveState = ETH_READ_FAIL;
       }
       break;
 
-    case READ_PAYLOAD:
+    case ETH_READ_SUCCESS:
       /* Success now read the Payload by higher layer */
       break;
 
-    case ETH_RECEIVE_FAIL:
+    case ETH_READ_FAIL:
       break;
 
     default:
@@ -758,15 +764,18 @@ void McEthIp_SendARP(uint8* DstIpAddress)
     case ETH_SEND_ARP:
       if (McEth_TransmitMessage())
       {
-        McEthIp_SendARPState = ETH_SUCCESSSEND_ARP;
+        McEthIp_SendARPState = ETH_SUCCESS_SEND_ARP;
       }
       else
       {
-        McEthIp_SendARPState = ETH_FAILSEND_ARP;
+        McEthIp_SendARPState = ETH_FAIL_SEND_ARP;
       }
       break;
 
-    case ETH_FAILSEND_ARP:
+    case ETH_FAIL_SEND_ARP:
+      break;
+
+    case ETH_SUCCESS_SEND_ARP:
       break;
 
     default:
@@ -849,18 +858,18 @@ void McEthIp_GetARP(void)
       if (McEthIp_EvalARP())
       {
         McEth_ResetReceiveBuffer();
-        McEthIp_GetARPState = ETH_SUCCESSRECEIVE_ARP;
+        McEthIp_GetARPState = ETH_SUCCESS_RECEIVE_ARP;
       }
       else
       {
-        McEthIp_GetARPState = ETH_FAIRECEIVE_ARP;
+        McEthIp_GetARPState = ETH_FAIL_RECEIVE_ARP;
       }
       break;
 
-    case  ETH_SUCCESSRECEIVE_ARP:
+    case  ETH_SUCCESS_RECEIVE_ARP:
       break;
 
-    case  ETH_FAIRECEIVE_ARP:
+    case  ETH_FAIL_RECEIVE_ARP:
       break;
 
     default:
