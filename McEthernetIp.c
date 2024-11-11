@@ -34,16 +34,15 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define MCETHIP_DATASIZE     128
 #define MCETHIP_HEADER_LEN   20
 #define MCETHIP_ARP_PACKETLEN 28
 #define MCETHIP_ADDRESS_SIZE 4
-#define DMA_ETHTRANSMITPRIORITY 3
+#define DMA_ETH_TRANSMIT_PRIORITY 3
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
 uint16 McEthIp_TransmitTcpChecksum;
-uint8 McEthIp_TransmitBuffer[MCETHIP_DATASIZE];
+uint8 McEthIp_TransmitBuffer[MC_ETHERNET_DATASIZE];
 
 static uint8 McEthIp_TxSrcIpAddress[MCETHIP_ADDRESS_SIZE] = {192, 168, 2, 1};
 static uint8 McEthIp_TxDstIpAddress[MCETHIP_ADDRESS_SIZE] = {0, 0, 0, 0};
@@ -89,12 +88,14 @@ IfxDma_Dma_Channel McEthIp_DmaTransmitPachetHandler;
 
 MCETHIP_PAYLOAD McEthIp_Payload =
 {
-    .WritePayloadIndex = 0x0,
-    .ReadPayloadIndex = 0x0,
-    .Buffer = McEth_Buf,
-    .WriteBufferSize = 0,
-    .ReadBufferSize = MC_ETHERNET_MAXFRAME
+    0,
+    0,
+    McEth_Buf,
+    0,
+    MC_ETHERNET_MAXFRAME
 };
+
+static uint16 McEthIp_PayloadRemain;
 
 MCETHIP_ARP_TRANSMIT_STATE McEthIp_SendARPState = ETH_CREATE_ARP;
 MCETHIP_ARP_TRANSMIT_STATE McEthIp_GetARPState = ETH_GET_ARP;
@@ -116,13 +117,20 @@ static uint16 McEthIpCheckSumCalc(uint8* BytesArray, uint16 size);
  * \param McEthIp_DmaTransmitIsr
  * \return void
  */
-IFX_INTERRUPT(McEthIp_DmaTransmitIsr, 0, DMA_ETHTRANSMITPRIORITY);
+IFX_INTERRUPT(McEthIp_DmaTransmitIsr, 0, DMA_ETH_TRANSMIT_PRIORITY);
 void McEthIp_DmaTransmitIsr(void)
 {
-     /* It goes inside no need to do anything yet */
+  if (McEthIp_PayloadRemain > MC_ETHERNET_DATASIZE)
+  {
+    McEth_WriteIndex = (McEth_WriteIndex  + MC_ETHERNET_DATASIZE) % MC_ETHERNET_MAXFRAME;
+  }
+  else
+  {
+    McEth_WriteIndex = (McEth_WriteIndex + McEthIp_PayloadRemain) % MC_ETHERNET_MAXFRAME;
+  }
+  McEth_ReadIndex = (McEth_WriteIndex + 1) % MC_ETHERNET_MAXFRAME;
+
 }
-
-
 
 /** \brief Initializes the Ethernet Module
  * This Initializes the Ethernet Module
@@ -134,7 +142,7 @@ void McEthIp_Init(uint8* SrcMacAddress)
   McEthIp_DmaTransmitPachetHandler.channelId = IfxDma_ChannelId_0;
 
   /* Initialize the Source and Destination to be the same  then it will change in the next transaction */
-  Dma_Init(&McEthIp_DmaTransmitPachetHandler, 128, (uint32)(&McEthIp_TransmitBuffer[0]), (uint32)(&McEthIp_TransmitBuffer[0]), DMA_ETHTRANSMITPRIORITY);
+  Dma_Init(&McEthIp_DmaTransmitPachetHandler, 128, (uint32)(&McEthIp_TransmitBuffer[0]), (uint32)(&McEthIp_TransmitBuffer[0]), DMA_ETH_TRANSMIT_PRIORITY);
   McEth_Init(SrcMacAddress);
 }
 
@@ -316,31 +324,29 @@ static void McEthIp_CreateTcpHeader(uint16 PayloadSize)
  */
 static void McEthIp_CreatePayload(uint8* DataPayload, uint16 PayloadSize)
 {
-  uint16 PayloadRemain = PayloadSize;
-  uint16 counter = 128;
+  McEthIp_PayloadRemain = PayloadSize;
+  McEthIp_Payload.WriteBufferSize = PayloadSize;
   uint8 NewCheckSum[2];
 
-  while (PayloadRemain >= 128)
+  while (McEthIp_PayloadRemain >= 128)
   {
-    Dma_SetSourceAddress (&McEthIp_DmaTransmitPachetHandler, (uint32)&DataPayload[counter - 128]);
+    Dma_SetSourceAddress (&McEthIp_DmaTransmitPachetHandler, (uint32)&DataPayload[McEth_WriteIndex]);
     Dma_SetDestinationAddress(&McEthIp_DmaTransmitPachetHandler, (uint32)&McEthIp_TransmitBuffer[0]);
     Dma_Transfer(&McEthIp_DmaTransmitPachetHandler);
-    McEthIpUpdateTcpCheckSum(McEthIp_TransmitBuffer, MCETHIP_DATASIZE);
-    McEth_PushTransmitMessage(McEthIp_TransmitBuffer, MCETHIP_DATASIZE);
-    PayloadRemain -= 128;
-    /* Multiply by 2 */
-    counter+=128;
+    McEthIpUpdateTcpCheckSum(McEthIp_TransmitBuffer, MC_ETHERNET_DATASIZE);
+    McEth_PushTransmitMessage(McEthIp_TransmitBuffer, MC_ETHERNET_DATASIZE);
+    McEthIp_PayloadRemain -= 128;
   }
 
-  if (PayloadRemain > 0)
+  if (McEthIp_PayloadRemain > 0)
   {
-    IfxDma_Dma_setChannelTransferCount(&McEthIp_DmaTransmitPachetHandler, PayloadRemain);
-    Dma_SetSourceAddress (&McEthIp_DmaTransmitPachetHandler, (uint32)&DataPayload[counter]);
+    IfxDma_Dma_setChannelTransferCount(&McEthIp_DmaTransmitPachetHandler, McEthIp_PayloadRemain);
+    Dma_SetSourceAddress (&McEthIp_DmaTransmitPachetHandler, (uint32)&DataPayload[McEth_WriteIndex]);
     Dma_SetDestinationAddress(&McEthIp_DmaTransmitPachetHandler, (uint32)&McEthIp_TransmitBuffer[0]);
     Dma_Transfer(&McEthIp_DmaTransmitPachetHandler);
-    McEthIpUpdateTcpCheckSum(McEthIp_TransmitBuffer, PayloadRemain);
-    McEth_PushTransmitMessage(McEthIp_TransmitBuffer, PayloadRemain);
-    IfxDma_Dma_setChannelTransferCount(&McEthIp_DmaTransmitPachetHandler, MCETHIP_DATASIZE);
+    McEthIpUpdateTcpCheckSum(McEthIp_TransmitBuffer, McEthIp_PayloadRemain);
+    McEth_PushTransmitMessage(McEthIp_TransmitBuffer, McEthIp_PayloadRemain);
+    IfxDma_Dma_setChannelTransferCount(&McEthIp_DmaTransmitPachetHandler, MC_ETHERNET_DATASIZE);
 
   }
   else
@@ -393,6 +399,8 @@ void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize)
       /* Send the message */
       if (McEth_TransmitMessage())
       {
+        McEthIp_Payload.ReadIndex = McEth_ReadIndex;
+        McEthIp_Payload.WriteIndex = McEth_WriteIndex;
         McEthIp_TransmitState = ETH_TRANSMIT_IDLE;
       }
       else
@@ -557,14 +565,13 @@ void McEthIpReadPayload(void)
   McEthIp_Payload.ReadBufferSize = (McEth_ReceiveBytesNum - 4);
   while(McEth_ReceiveBytesNum > 128)
   {
-    McEth_ReadReceivedPayload(&McEth_Buf[McEthIp_Payload.ReadPayloadIndex], 128);
+    McEth_ReadReceivedPayload(&McEth_Buf[McEth_ReadIndex], 128);
   }
 
   if (McEth_ReceiveBytesNum > 0)
   {
-    McEth_ReadReceivedPayload(&McEth_Buf[McEthIp_Payload.ReadPayloadIndex], McEth_ReceiveBytesNum);
+    McEth_ReadReceivedPayload(&McEth_Buf[McEth_WriteIndex], McEth_ReceiveBytesNum);
   }
-  McEthIp_Payload.WritePayloadIndex = (McEthIp_Payload.ReadPayloadIndex + 1) % MC_ETHERNET_MAXFRAME;
 }
 
 
@@ -618,6 +625,8 @@ void McEthIp_TcpReceivePacket(void)
       if (McEthIpEvaluateTcpHeader())
       {
         McEthIpReadPayload();
+        McEthIp_Payload.ReadIndex = McEth_ReadIndex;
+        McEthIp_Payload.WriteIndex = McEth_WriteIndex;
         McEthIp_ReceiveState = READ_PAYLOAD;
       }
       else

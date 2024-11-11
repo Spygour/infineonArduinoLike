@@ -80,7 +80,7 @@ void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 So
   /* Destination Address configuration */
   DmaChCfg.destinationAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
   DmaChCfg.destinationAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
-  DmaChCfg.destinationAddressCircularRange = IfxDma_ChannelIncrementCircular_none;
+  DmaChCfg.destinationAddressCircularRange = IfxDma_ChannelIncrementCircular_2048;
 
   /* Handle the source and destination Address */
   DmaChCfg.sourceAddress = (uint32)SourceAddress;

@@ -36,7 +36,7 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define DMA_ETHRECEIVEPRIORITY   4
+#define DMA_ETH_RECEIVE_PRIORITY   4
 #define MC_ETHERNET_RESET        &MODULE_P33,10
 #define MC_ETHERNET_SPIBAUDRATE  10000000
 #define MC_ETHERNET_WRITECOMMAND 2
@@ -160,7 +160,7 @@ static MCETH_PACKET McEth_MasterPacketReceive =
 IfxDma_Dma_Channel McEthiIp_DmaReceivePachetHandler;
 
 static uint8 McEth_RxBuffer[2];
-uint8 McEth_Buf[MC_ETHERNET_MAXFRAME];
+uint8 McEth_Buf[2048];
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -189,18 +189,19 @@ IFX_INTERRUPT(SpimasterErMcEth, 0, 48);                 /* SPI Master ISR for er
  * \param McEth_DmaReceiveIsr interrupt receive function
  * \return None
  */
-IFX_INTERRUPT(McEth_DmaReceiveIsr, 0, DMA_ETHRECEIVEPRIORITY);
+IFX_INTERRUPT(McEth_DmaReceiveIsr, 0, DMA_ETH_RECEIVE_PRIORITY);
 void McEth_DmaReceiveIsr(void)
 {
-    if (McEth_ReceiveBytesNum > 128)
-    {
-      McEth_ReadIndex = (McEth_ReadIndex + 128) % MC_ETHERNET_MAXFRAME;
-    }
-    else
-    {
-      McEth_ReadIndex = (McEth_ReadIndex + McEth_ReceiveBytesNum) % MC_ETHERNET_MAXFRAME;
-    }
-     /* It goes inside no need to do anything yet */
+  if (McEth_ReceiveBytesNum > MC_ETHERNET_DATASIZE)
+  {
+    McEth_ReadIndex = (McEth_ReadIndex  + MC_ETHERNET_DATASIZE) %  MC_ETHERNET_MAXFRAME;
+  }
+  else
+  {
+    McEth_ReadIndex = (McEth_ReadIndex + McEth_ReceiveBytesNum) % MC_ETHERNET_MAXFRAME;
+  }
+  McEth_WriteIndex = (McEth_ReadIndex + 1) % MC_ETHERNET_MAXFRAME;
+
 }
 
 
@@ -233,7 +234,7 @@ void McEth_Init(uint8* MacAddress)
 {
   McEthiIp_DmaReceivePachetHandler.channelId = IfxDma_ChannelId_1;
   /* Initialize the Source and Destination to be the same  then it will change in the next transaction */
-  Dma_Init(&McEthiIp_DmaReceivePachetHandler, 128, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETHRECEIVEPRIORITY);
+  Dma_Init(&McEthiIp_DmaReceivePachetHandler, 128, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_RECEIVE_PRIORITY);
 
   uint8 tmp;
   Ifx_TickTime delay100ms = IfxStm_getTicksFromMilliseconds(BSP_DEFAULT_TIMER,100);

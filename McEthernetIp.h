@@ -112,8 +112,8 @@ typedef struct
 
 typedef struct MCETHIP_PAYLOAD
 {
-    uint16  WritePayloadIndex;
-    uint16  ReadPayloadIndex;
+    uint16  WriteIndex;
+    uint16  ReadIndex;
     uint8*  Buffer;
     uint16  WriteBufferSize;
     uint16  ReadBufferSize;
