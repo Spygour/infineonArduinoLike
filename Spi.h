@@ -93,9 +93,11 @@ void Spi_WriteRegisterVal(SpiChannel_t* SpiChannel, uint8 Reg, uint8 Val);
 void Spi_ReadRegister(SpiChannel_t* SpiChannel, uint8 Reg, uint8* regVal, uint16 size);
 void Spi_WriteBytes(SpiChannel_t* SpiChannel, uint8* Src, uint16 size);
 void Spi_ReadBytes(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint8* Dest, uint16 DestSize);
+void Spi_WriteBuffer(SpiChannel_t* SpiChannel, uint16 size);
 void Spi_ReadBuffer(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint16 size);
+uint32 Spi_ReturnSpiTxBufferAddr(uint16 index);
 uint32 Spi_ReturnSpiRxBufferAddr(uint16 index);
-
+void Spi_SetTxBufferIndex(uint8 val, uint8 index);
 void Spi_SlaveInit(IfxQspi_SpiSlave* SpiSlave,SpiSlavePins_t* SpiSlavePins, SpiChannelConfig* ChannelConfig);
 void Spi_SlaveExchange(IfxQspi_SpiSlave* SpiSlave, uint8* SpiSlaveTx, uint8* SpiSlaveRx, uint16 size);
 

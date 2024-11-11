@@ -66,7 +66,7 @@ static uint8 SpiRxBuffer[150];
 
 
  /** \brief Initializes the Spi Module
-  * \param Spi_ChannelInit read function
+  * \param Spi_ChannelInit
   * \return void
   */
  void Spi_Init(SpiMasterPins_t* SpiMasterPins, SpiMasterCfg_t* MasterCfg)
@@ -100,9 +100,8 @@ static uint8 SpiRxBuffer[150];
 
 
 
-
  /** \brief Initialize an Spi Channel
-  * \param Spi_ChannelInit read function
+  * \param Spi_ChannelInit
   * \return void
   */
  void Spi_ChannelInit(SpiMasterCfg_t* SpiMasterCfg, SpiChannel_t* SpiChannel, SpiChannelConfig* ChannelConfig)
@@ -136,7 +135,7 @@ static uint8 SpiRxBuffer[150];
 
 
  /** \brief Writes one byte throug Spi
-  * \param Spi_WriteRegister read function
+  * \param Spi_WriteRegister
   * \return void
   */
  void Spi_WriteRegister(SpiChannel_t* SpiChannel, uint8 Reg)
@@ -153,7 +152,7 @@ static uint8 SpiRxBuffer[150];
 
 
  /** \brief Writes to one register
-  * \param Spi_WriteRegisterVal read function
+  * \param Spi_WriteRegisterVal
   * \return void
   */
  void Spi_WriteRegisterVal(SpiChannel_t* SpiChannel, uint8 Reg, uint8 Val)
@@ -171,7 +170,7 @@ static uint8 SpiRxBuffer[150];
 
 
  /** \brief Reads one or more than one registers
-  * \param Spi_ReadRegister read function
+  * \param Spi_ReadRegister
   * \return void
   */
  void Spi_ReadRegister(SpiChannel_t* SpiChannel, uint8 Reg, uint8* regVal, uint16 size)
@@ -215,7 +214,7 @@ static uint8 SpiRxBuffer[150];
 
 
  /** \brief This reads bytes, stores data to the RxBuffer and copy the data to an pointer
-  * \param Spi_ReadBytes read function
+  * \param Spi_ReadBytes
   * \return void
   */
  void Spi_ReadBytes(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint8* Dest, uint16 DestSize)
@@ -242,6 +241,20 @@ static uint8 SpiRxBuffer[150];
 
 
 
+ /** \brief This Writes the data the is in the SpiTxBuffer
+  * \param Spi_WriteBuffer
+  * \return void
+  */
+ void Spi_WriteBuffer(SpiChannel_t* SpiChannel, uint16 size)
+ {
+   while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
+   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], NULL_PTR,size);
+
+   while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
+ }
+
+
+
  /** \brief This reads and stores data to the RxBuffer
   * \param Spi_ReadBuffer read function
   * \return void
@@ -249,7 +262,6 @@ static uint8 SpiRxBuffer[150];
  void Spi_ReadBuffer(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint16 size)
  {
    while( IfxQspi_SpiMaster_getStatus(SpiChannel) == SpiIf_Status_busy );
-   IfxQspi_SpiMaster_exchange(SpiChannel, &SpiTxBuffer[0], NULL_PTR, size);
 
    for(uint16 i=0;i<SrcSize;i++)
    {
@@ -268,6 +280,17 @@ static uint8 SpiRxBuffer[150];
 
 
 
+ /** \brief This returns the address of the TxBuffer
+  * \param Spi_ReturnSpiTxBufferAddr read function
+  * \return uint32
+  */
+ uint32 Spi_ReturnSpiTxBufferAddr(uint16 index)
+ {
+   return (uint32)(&SpiTxBuffer[index]);
+ }
+
+
+
  /** \brief This returns the address of the RxBuffer
   * \param Spi_ReturnRxBufferAddr read function
   * \return uint32
@@ -278,6 +301,15 @@ static uint8 SpiRxBuffer[150];
  }
 
 
+
+ /** \brief This sets a value in specific index of the TxBuffer
+   * \param Spi_SetTxBufferIndex
+   * \return uint32
+   */
+void Spi_SetTxBufferIndex(uint8 val, uint8 index)
+{
+  SpiTxBuffer[index] = val;
+}
  /*************************************************************************/
  /************************** SPI Slave Part *******************************/
  /*************************************************************************/

@@ -51,7 +51,7 @@
 /*********************************************************************************************************************/
 
 
-void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority)
+void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc, IfxDma_ChannelIncrementCircular DstCirc)
 {
   IfxDma_Dma Dma_Inst;
   /* Create module configuration */
@@ -75,12 +75,12 @@ void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 So
   /* Source Address configuration */
   DmaChCfg.sourceAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
   DmaChCfg.sourceAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
-  DmaChCfg.sourceAddressCircularRange = IfxDma_ChannelIncrementCircular_none;
+  DmaChCfg.sourceAddressCircularRange = SourceCirc;
 
   /* Destination Address configuration */
   DmaChCfg.destinationAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
   DmaChCfg.destinationAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
-  DmaChCfg.destinationAddressCircularRange = IfxDma_ChannelIncrementCircular_2048;
+  DmaChCfg.destinationAddressCircularRange = DstCirc;
 
   /* Handle the source and destination Address */
   DmaChCfg.sourceAddress = (uint32)SourceAddress;
