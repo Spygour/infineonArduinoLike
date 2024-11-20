@@ -126,7 +126,7 @@ typedef struct MCETHIP_PAYLOAD
 extern MCETH_IP_TRANSMIT_STATE McEthIp_TransmitState;
 extern MCETH_IP_RECEIVE_STATE McEthIp_ReceiveState;
 extern MCETHIP_ARP_TRANSMIT_STATE McEthIp_SendARPState;
-extern MCETHIP_ARP_TRANSMIT_STATE McEthIp_GetARPState ;
+extern MCETHIP_ARP_RECEIVE_STATE McEthIp_GetARPState ;
 extern MCETHIP_PAYLOAD McEthIp_Payload;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
@@ -146,6 +146,7 @@ void McEthIp_GetSrcIpAddress(uint8* ptr);
 void McEthIp_GetDstIpAddress(uint8* ptr);
 void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize);
 void McEthIp_TcpReceivePacket(void);
-
+void McEthIp_SendARP(uint8* DstIpAddress);
+void McEthIp_GetARP(void);
 
 #endif /* INFINEONARDUINOLIKE_McEthIP_H_ */

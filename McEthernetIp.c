@@ -43,7 +43,7 @@
 uint16 McEthIp_TransmitTcpChecksum;
 uint8 McEthIp_TransmitBuffer[MC_ETHERNET_DATASIZE];
 
-static uint8 McEthIp_TxSrcIpAddress[MCETHIP_ADDRESS_SIZE] = {192, 168, 2, 1};
+static uint8 McEthIp_TxSrcIpAddress[MCETHIP_ADDRESS_SIZE] = {192, 168, 2, 4};
 static uint8 McEthIp_TxDstIpAddress[MCETHIP_ADDRESS_SIZE] = {0, 0, 0, 0};
 
 static MCETHIP_IP_ADDRESS McEthIp_IpAddress = {
@@ -94,8 +94,7 @@ MCETHIP_PAYLOAD McEthIp_Payload =
 static uint16 McEthIp_PayloadRemain;
 
 MCETHIP_ARP_TRANSMIT_STATE McEthIp_SendARPState = ETH_CREATE_ARP;
-MCETHIP_ARP_TRANSMIT_STATE McEthIp_GetARPState = ETH_GET_ARP;
-
+MCETHIP_ARP_RECEIVE_STATE McEthIp_GetARPState = ETH_GET_ARP;
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -310,8 +309,8 @@ static void McEthIp_CreatePayload(uint8* DataPayload, uint16 PayloadSize)
 
   if (McEthIp_PayloadRemain > 0)
   {
-    McEthIpUpdateTcpCheckSum(McEthIp_TransmitBuffer, McEthIp_PayloadRemain);
-    McEth_PushTransmitPayload(McEthIp_TransmitBuffer, McEthIp_PayloadRemain);
+    McEthIpUpdateTcpCheckSum(&DataPayload[McEth_WriteIndex], McEthIp_PayloadRemain);
+    McEth_PushTransmitPayload(&DataPayload[McEth_WriteIndex], McEthIp_PayloadRemain);
   }
   else
   {
@@ -776,6 +775,7 @@ void McEthIp_SendARP(uint8* DstIpAddress)
       break;
 
     case ETH_SUCCESS_SEND_ARP:
+      McEthIp_SendARPState = ETH_CREATE_ARP;
       break;
 
     default:
@@ -838,6 +838,12 @@ static boolean McEthIp_EvalARP(void)
   }
 }
 
+
+
+/** \brief Gets back a ARP packet
+ * \param McEthIp_GetARP function
+ * \return void
+ */
 void McEthIp_GetARP(void)
 {
   switch(McEthIp_GetARPState)
