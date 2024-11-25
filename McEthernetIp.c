@@ -82,15 +82,6 @@ static MCETHIP_TCPHEADER McEthIp_TcpHeader = {
 MCETH_IP_TRANSMIT_STATE McEthIp_TransmitState = ETH_TRANSMIT_IDLE;
 MCETH_IP_RECEIVE_STATE McEthIp_ReceiveState = ETH_RECEIVE_IDLE;
 
-MCETHIP_PAYLOAD McEthIp_Payload =
-{
-    .ReadIndex = 0,
-    .WriteIndex = 0,
-    .Buffer = McEth_Buf,
-    .WriteBufferSize = 0,
-    .ReadBufferSize = MC_ETHERNET_MAXFRAME
-};
-
 static uint16 McEthIp_PayloadRemain;
 
 MCETHIP_ARP_TRANSMIT_STATE McEthIp_SendARPState = ETH_CREATE_ARP;
@@ -251,20 +242,17 @@ static void McEthIp_CreateTcpHeader(uint16 PayloadSize)
   McEthIp_TcpHeaderTemp[10] = (uint8)(McEthIp_TcpHeader.Aknowledgment >> 8);
   McEthIp_TcpHeaderTemp[11] = (uint8)(McEthIp_TcpHeader.Aknowledgment & 0x00FF);
   /* Data Offset 4 Bits and flags by 4 bits*/
-  McEthIp_TcpHeaderTemp[12] = McEthIp_TcpHeader.DataOffsetAndFlags;
+  McEthIp_TcpHeaderTemp[12] = (uint8)(McEthIp_TcpHeader.DataOffsetAndFlags >> 8);
+  McEthIp_TcpHeaderTemp[13] = (uint8)(McEthIp_TcpHeader.DataOffsetAndFlags & 0x00FF);
   /* Window Size 2 Bytes */
-  McEthIp_TcpHeaderTemp[13] = (uint8)(McEthIp_TcpHeader.WindowSize >> 8);
-  McEthIp_TcpHeaderTemp[14] = (uint8)(McEthIp_TcpHeader.WindowSize & 0x00FF);
+  McEthIp_TcpHeaderTemp[14] = (uint8)(McEthIp_TcpHeader.WindowSize >> 8);
+  McEthIp_TcpHeaderTemp[15] = (uint8)(McEthIp_TcpHeader.WindowSize & 0x00FF);
   /* CheckSum Is 0 for now 2 Bytes */
-  McEthIp_TcpHeaderTemp[15] = 0;
   McEthIp_TcpHeaderTemp[16] = 0;
+  McEthIp_TcpHeaderTemp[17] = 0;
   /* UrgentPointer 2 Bytes */
-  McEthIp_TcpHeaderTemp[17] = (uint8)(McEthIp_TcpHeader.UrgentPointer >> 8);
-  McEthIp_TcpHeaderTemp[18] = (uint8)(McEthIp_TcpHeader.UrgentPointer & 0x00FF);
-
-
-  /* Options are zero so we don't need them for now */
-  McEthIp_TcpHeaderTemp[19] = 0;
+  McEthIp_TcpHeaderTemp[18] = (uint8)(McEthIp_TcpHeader.UrgentPointer >> 8);
+  McEthIp_TcpHeaderTemp[19] = (uint8)(McEthIp_TcpHeader.UrgentPointer & 0x00FF);
 
   McEthIpUpdateTcpCheckSum(McEthIp_TcpHeaderTemp, MCETHIP_HEADER_LEN);
 
@@ -297,20 +285,20 @@ static void McEthIp_CreateTcpHeader(uint16 PayloadSize)
 static void McEthIp_CreatePayload(uint8* DataPayload, uint16 PayloadSize)
 {
   McEthIp_PayloadRemain = PayloadSize;
-  McEthIp_Payload.WriteBufferSize = PayloadSize;
+  McEth_Payload.WriteBufferSize = PayloadSize;
   uint8 NewCheckSum[2];
 
   while (McEthIp_PayloadRemain >= MC_ETHERNET_DATASIZE)
   {
-    McEthIpUpdateTcpCheckSum(&DataPayload[McEth_WriteIndex], MC_ETHERNET_DATASIZE);
-    McEth_PushTransmitPayload(&DataPayload[McEth_WriteIndex], MC_ETHERNET_DATASIZE);
+    McEthIpUpdateTcpCheckSum(&DataPayload[McEth_Payload.WriteIndex], MC_ETHERNET_DATASIZE);
+    McEth_PushTransmitPayload(&DataPayload[McEth_Payload.WriteIndex], MC_ETHERNET_DATASIZE);
     McEthIp_PayloadRemain -= MC_ETHERNET_DATASIZE;
   }
 
   if (McEthIp_PayloadRemain > 0)
   {
-    McEthIpUpdateTcpCheckSum(&DataPayload[McEth_WriteIndex], McEthIp_PayloadRemain);
-    McEth_PushTransmitPayload(&DataPayload[McEth_WriteIndex], McEthIp_PayloadRemain);
+    McEthIpUpdateTcpCheckSum(&DataPayload[McEth_Payload.WriteIndex], McEthIp_PayloadRemain);
+    McEth_PushTransmitPayload(&DataPayload[McEth_Payload.WriteIndex], McEthIp_PayloadRemain);
   }
   else
   {
@@ -362,8 +350,7 @@ void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize)
       /* Send the message */
       if (McEth_TransmitMessage())
       {
-        McEthIp_Payload.WriteIndex = McEth_WriteIndex;
-        McEthIp_Payload.ReadIndex = McEth_ReadIndex;
+        McEth_Payload.ReadIndex = McEth_Payload.WriteIndex;
         McEthIp_TransmitState = ETH_SEND_SUCCESS;
       }
       else
@@ -532,15 +519,15 @@ static boolean McEthIpEvaluateTcpHeader(void)
  */
 void McEthIpReadPayload(void)
 {
-  McEthIp_Payload.ReadBufferSize = (McEth_ReceiveBytesNum - 4);
+  McEth_Payload.ReadBufferSize = (McEth_ReceiveBytesNum - 4);
   while(McEth_ReceiveBytesNum > MC_ETHERNET_DATASIZE)
   {
-    McEth_ReadReceivedPayload(&McEth_Buf[McEth_ReadIndex], MC_ETHERNET_DATASIZE);
+    McEth_ReadReceivedPayload(&McEth_Payload.Buffer[McEth_Payload.ReadIndex], MC_ETHERNET_DATASIZE);
   }
 
   if (McEth_ReceiveBytesNum > 0)
   {
-    McEth_ReadReceivedPayload(&McEth_Buf[McEth_ReadIndex], McEth_ReceiveBytesNum);
+    McEth_ReadReceivedPayload(&McEth_Payload.Buffer[McEth_Payload.ReadIndex], McEth_ReceiveBytesNum);
   }
 }
 
@@ -595,8 +582,7 @@ void McEthIp_TcpReceivePacket(void)
       if (McEthIpEvaluateTcpHeader())
       {
         McEthIpReadPayload();
-        McEthIp_Payload.WriteIndex = McEth_WriteIndex;
-        McEthIp_Payload.ReadIndex = McEth_ReadIndex;
+        McEth_Payload.WriteIndex = McEth_Payload.ReadIndex;
         McEthIp_ReceiveState = ETH_READ_SUCCESS;
       }
       else
@@ -883,3 +869,59 @@ void McEthIp_GetARP(void)
   }
 }
 
+
+
+/** \brief Initializes the Tcp header for a Http/Https Request
+ * \param McEthIp_PrepareRequest function
+ * \return void
+ */
+void McEthIp_PrepareRequest(MCETHIP_REQUEST RequestType)
+{
+  /* First set the Destination Mac Address to Broadcast */
+  uint8 DstMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  McEth_SetDstMacAddress(DstMac);
+  /* This value is mostly used by all the Ethernet Firmware */
+  McEthIp_TcpHeader.WindowSize = 8192;
+  /* As an initialize TCP the Flags need to be 2 */
+  McEthIp_TcpHeader.DataOffsetAndFlags = (5 << 12) | 0x12;
+  switch (RequestType)
+  {
+    case HTTP:
+      /* Http is 80 */
+      McEthIp_TcpHeader.TcpSrcDst->TcpDst = 0x50;
+      break;
+
+    case HTTPS:
+      /* Https is 443 */
+      McEthIp_TcpHeader.TcpSrcDst->TcpDst = 0x1BB;
+      break;
+
+    default:
+      McEthIp_TcpHeader.TcpSrcDst->TcpDst = 0x50;
+      break;
+  }
+}
+
+
+
+/** \brief Updates Data Offset and flags after the first message
+ * \param McEthIp_UpdateFlags function
+ * \return void
+ */
+void McEthIp_UpdateFlags(void)
+{
+  /* Change only to ACK now */
+  McEthIp_TcpHeader.DataOffsetAndFlags = (5 << 12) | 0x10;
+}
+
+
+
+/** \brief Updates the flags in case we want to terminate the connection
+ * \param McEthIp_TerminateFlags function
+ * \return void
+ */
+void McEthIp_TerminateFlags(void)
+{
+  /* Change only to ACK now */
+  McEthIp_TcpHeader.DataOffsetAndFlags = (5 << 12) | 0x110;
+}

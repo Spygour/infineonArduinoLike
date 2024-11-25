@@ -106,20 +106,19 @@ typedef struct
    MCETHIP_TCP_ADDRESS*  TcpSrcDst;
    uint32                SeqNumber;
    uint32                Aknowledgment;
-   uint8                 DataOffsetAndFlags;
+   uint16                DataOffsetAndFlags;
    uint16                WindowSize;
    uint16                CheckSum;
    uint16                UrgentPointer;
 }MCETHIP_TCPHEADER;
 
-typedef struct MCETHIP_PAYLOAD
+
+typedef enum
 {
-    uint16  WriteIndex;
-    uint16  ReadIndex;
-    uint8*  Buffer;
-    uint16  WriteBufferSize;
-    uint16  ReadBufferSize;
-}MCETHIP_PAYLOAD;
+  HTTP,
+  HTTPS
+}MCETHIP_REQUEST;
+
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -127,7 +126,6 @@ extern MCETH_IP_TRANSMIT_STATE McEthIp_TransmitState;
 extern MCETH_IP_RECEIVE_STATE McEthIp_ReceiveState;
 extern MCETHIP_ARP_TRANSMIT_STATE McEthIp_SendARPState;
 extern MCETHIP_ARP_RECEIVE_STATE McEthIp_GetARPState ;
-extern MCETHIP_PAYLOAD McEthIp_Payload;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -148,5 +146,7 @@ void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize);
 void McEthIp_TcpReceivePacket(void);
 void McEthIp_SendARP(uint8* DstIpAddress);
 void McEthIp_GetARP(void);
-
+void McEthIp_PrepareRequest(MCETHIP_REQUEST RequestTypes);
+void McEthIp_UpdateFlags(void);
+void McEthIp_TerminateFlags(void);
 #endif /* INFINEONARDUINOLIKE_McEthIP_H_ */

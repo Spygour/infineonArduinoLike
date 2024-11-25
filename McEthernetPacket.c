@@ -135,8 +135,6 @@ static uint8 McEth_ReceiveStatusVector[4] = {0, 0, 0, 0};
 uint16 McEth_WriteAddress = 0;
 static uint16 McEth_ReadAddress = 0;
 uint8 McEth_ReceiveBytesNum = 0;
-uint16 McEth_WriteIndex = 0;
-uint16 McEth_ReadIndex = 0;
 
 static MCETH_PACKET McEth_MasterPacketTransmit =
 {
@@ -164,6 +162,15 @@ IfxDma_Dma_Channel McEth_DmaReceivePachetHandler;
 static uint8 McEth_RxBuffer[2];
 uint8 McEth_Buf[2048];
 static uint16 McEth_WriteChunkSize = 0;
+
+MCETH_PAYLOAD McEth_Payload =
+{
+    .ReadIndex = 0,
+    .WriteIndex = 0,
+    .Buffer = McEth_Buf,
+    .WriteBufferSize = 0,
+    .ReadBufferSize = MC_ETHERNET_MAXFRAME
+};
 
 static volatile boolean McEth_WriteSuccess = FALSE;
 static volatile boolean McEth_ReadSuccess = FALSE;
@@ -217,8 +224,7 @@ void McEthIp_DmaTransmitIsr(void)
 
 static inline void McEth_UpdateWriteIndex(uint16 size)
 {
-  McEth_WriteIndex = (McEth_WriteIndex + size) % MC_ETHERNET_MAXFRAME;
-  McEth_ReadIndex = (McEth_WriteIndex + 1) % MC_ETHERNET_MAXFRAME;
+  McEth_Payload.WriteIndex = (McEth_Payload.WriteIndex + size) % MC_ETHERNET_MAXFRAME;
   McEth_ReadSuccess = FALSE;
 }
 
@@ -227,13 +233,13 @@ static inline void McEth_UpdateReadIndex(void)
 {
   if (McEth_ReceiveBytesNum > MC_ETHERNET_DATASIZE)
   {
-    McEth_ReadIndex = (McEth_ReadIndex  + MC_ETHERNET_DATASIZE) %  MC_ETHERNET_MAXFRAME;
+    McEth_Payload.ReadIndex = (McEth_Payload.ReadIndex  + MC_ETHERNET_DATASIZE) %  MC_ETHERNET_MAXFRAME;
   }
   else
   {
-    McEth_ReadIndex = (McEth_ReadIndex + McEth_ReceiveBytesNum) % MC_ETHERNET_MAXFRAME;
+    McEth_Payload.ReadIndex = (McEth_Payload.ReadIndex + McEth_ReceiveBytesNum) % MC_ETHERNET_MAXFRAME;
   }
-  McEth_WriteIndex = (McEth_ReadIndex + 1) % MC_ETHERNET_MAXFRAME;
+  McEth_Payload.WriteIndex = (McEth_Payload.ReadIndex + 1) % MC_ETHERNET_MAXFRAME;
 }
 
 
@@ -985,7 +991,7 @@ static void McEth_WritePayload(uint8* Command, uint16 CommandSize)
   McEth_WriteChunkSize = CommandSize;
   Spi_SetTxBufferIndex(MC_ETHERNET_WRITEBUFFER, 0);
   IfxDma_Dma_setChannelTransferCount(&McEth_DmaTransmitPachetHandler, CommandSize);
-  Dma_SetSourceAddress (&McEth_DmaTransmitPachetHandler, (uint32)(&Command[McEth_WriteIndex]));
+  Dma_SetSourceAddress (&McEth_DmaTransmitPachetHandler, (uint32)(&Command[McEth_Payload.WriteIndex]));
   Dma_SetDestinationAddress(&McEth_DmaTransmitPachetHandler, Spi_ReturnSpiTxBufferAddr(1));
   Dma_Transfer(&McEth_DmaTransmitPachetHandler);
   /* Wait till transmittion complete */
