@@ -529,7 +529,7 @@ boolean McEth_PushTransmitPayload(uint8* Message, uint16 MessageSize)
   }
   else
   {
-    McEth_WriteAddress = EndAddress + 1;
+    McEth_WriteAddress = EndAddress;
   }
 
 
