@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file MicrochipEthernet.h
+ * \file McEthernetHandler.h
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -25,58 +25,39 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-#ifndef INFINEONARDUINOLIKE_MCETHERNETPACKET_H_
-#define INFINEONARDUINOLIKE_MCETHERNETPACKET_H_
+#ifndef INFINEONARDUINOLIKE_MCETHERNETHANDLER_H_
+#define INFINEONARDUINOLIKE_MCETHERNETHANDLER_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "Ifx_Types.h"
-#include "Dma.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define MC_ETHERNET_MAXFRAME     1500
-#define MC_ETHERNET_MACSIZE      6
-#define MC_ETHERNET_DATASIZE     256
-#define MC_ETHERNET_DMASIZE      2048
+typedef enum
+{
+  SEND_ARP_REQUEST,
+  VALIDATE_ARP_REQUEST,
+  ARP_REQUEST_SUCCESS,
+  AR_REQUEST_FAIL,
+}MCETHHANDLER_ARP;
 
 typedef enum
 {
-  TRANSMIT_MESSAGE,
-  RECEIVE_MESSAGE
-}MCETH_TYPE;
-
-typedef struct
-{
-    uint8*          SrcMacAddress;
-    uint8*          DstMacAddress;
-    uint8*          TypeLength;
-    uint8           MacAddressSize;
-    uint8           TypeLengthSize;
-    MCETH_TYPE      Type;
-}MCETH_PACKET;
-
-
-typedef struct
-{
-    uint16  WriteIndex;
-    uint16  ReadIndex;
-    uint8*  Buffer;
-    uint16  WriteBufferSize;
-    uint16  ReadBufferSize;
-}MCETH_PAYLOAD;
-
+  SEND_TCP_PACKET,
+  RECEIVE_TCP_PACKET,
+  TCP_HANDLE_SUCCESS,
+  TCP_HANDLE_FAIL
+}MCETHHANDLER_TCP;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
-extern uint16 McEth_WriteAddress;
-extern uint8 McEth_ReceiveBytesNum;
-extern MCETH_PAYLOAD McEth_Payload;
+
 /*********************************************************************************************************************/
 /*-------------------------------------------------Data Structures---------------------------------------------------*/
 /*********************************************************************************************************************/
-
+ 
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -84,23 +65,9 @@ extern MCETH_PAYLOAD McEth_Payload;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void McEth_SetSrcMacAddress(uint8* MacAddress);
-void McEth_GetSrcMacAddress(uint8* ptr);
-void McEth_SetDstMacAddress(uint8* MacAddress);
-void McEth_GetDstMacAddress(uint8* ptr);
-void McEth_Init(uint8* MacAddress);
-void McEth_CreateTransmitPacket(uint8* Type);
-boolean McEth_PushProtocolIndex(uint8* Message, uint16 MessageSize);
-boolean McEth_PushTransmitPayload(uint8* Message, uint16 MessageSize);
-boolean McEth_TransmitMessage(void);
-boolean McEth_ReceiveMsg(float32 time);
-boolean McEth_ReceiveMsgInf(void);
-void McEth_ReadEthernetProperties(void);
-uint16 McEth_ReturnReceiveType(void);
-void McEth_ReadReceivedBytes(uint8* ReceivePtr, uint16 ReceivePtrSize);
-void McEth_ReadReceivedPayload(uint8* ReceivePtr, uint16 ReceivePtrSize);
-void McEth_ResetReceiveBuffer(void);
-boolean McEth_WriteTransmitMemory(uint16 startMemory, uint8* newMessage, uint16 size);
-uint16 McEth_ReadWritePointer(void);
+void McEthHandler_Init(uint8* SrcMacAddress);
+void McEthHandler_StoreBytes(uint8* Data, uint16 Size);
+void McEthHandler_ARPRequest(uint8* DstIpAddress);
+void McEthHandler_TcpPacketMain(void);
 
-#endif /* INFINEONARDUINOLIKE_McEthPACKET_H_ */
+#endif /* INFINEONARDUINOLIKE_MCETHERNETHANDLER_H_ */

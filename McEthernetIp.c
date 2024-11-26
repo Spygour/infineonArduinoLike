@@ -95,22 +95,11 @@ MCETHIP_ARP_RECEIVE_STATE McEthIp_GetARPState = ETH_GET_ARP;
 /*********************************************************************************************************************/
 static void McEthIpUpdateIpCheckSum(uint8* IpHeader);
 static void McEthIpUpdateTcpCheckSum(uint8* BytesArray, uint16 size);
+static void McEthIpUpdateTcpCheckSumPayload(uint16 size);
 static uint16 McEthIpCheckSumCalc(uint8* BytesArray, uint16 size);
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
-/** \brief Initializes the Ethernet Module
- * This Initializes the Ethernet Module
- * \param McEthIp_Init
- * \return void
- */
-void McEthIp_Init(uint8* SrcMacAddress)
-{
-  McEth_Init(SrcMacAddress);
-}
-
-
-
 /** \brief Sets the Source IP Address
  * \param McEth_SetSrcIpAddress
  * \return void
@@ -282,23 +271,22 @@ static void McEthIp_CreateTcpHeader(uint16 PayloadSize)
  * \param McEth_SendPayload
  * \return void
  */
-static void McEthIp_CreatePayload(uint8* DataPayload, uint16 PayloadSize)
+static void McEthIp_CreatePayload(void)
 {
-  McEthIp_PayloadRemain = PayloadSize;
-  McEth_Payload.WriteBufferSize = PayloadSize;
+  McEthIp_PayloadRemain = McEth_Payload.WriteBufferSize;
   uint8 NewCheckSum[2];
 
   while (McEthIp_PayloadRemain >= MC_ETHERNET_DATASIZE)
   {
-    McEthIpUpdateTcpCheckSum(&DataPayload[McEth_Payload.WriteIndex], MC_ETHERNET_DATASIZE);
-    McEth_PushTransmitPayload(&DataPayload[McEth_Payload.WriteIndex], MC_ETHERNET_DATASIZE);
+    McEthIpUpdateTcpCheckSumPayload(MC_ETHERNET_DATASIZE);
+    McEth_PushTransmitPayload(&McEth_Payload.Buffer[McEth_Payload.WriteIndex], MC_ETHERNET_DATASIZE);
     McEthIp_PayloadRemain -= MC_ETHERNET_DATASIZE;
   }
 
   if (McEthIp_PayloadRemain > 0)
   {
-    McEthIpUpdateTcpCheckSum(&DataPayload[McEth_Payload.WriteIndex], McEthIp_PayloadRemain);
-    McEth_PushTransmitPayload(&DataPayload[McEth_Payload.WriteIndex], McEthIp_PayloadRemain);
+    McEthIpUpdateTcpCheckSumPayload(McEthIp_PayloadRemain);
+    McEth_PushTransmitPayload(&McEth_Payload.Buffer[McEth_Payload.WriteIndex], McEthIp_PayloadRemain);
   }
   else
   {
@@ -318,7 +306,7 @@ static void McEthIp_CreatePayload(uint8* DataPayload, uint16 PayloadSize)
  * \param McEthIp_InitTcpTransmitPacket
  * \return void
  */
-void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize)
+void McEthIp_TcpTransmitPacket(void)
 {
   uint8 Ipv4Type[2] = {0x08, 0x00};
   switch (McEthIp_TransmitState)
@@ -333,16 +321,16 @@ void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize)
       break;
 
     case SEND_IP_HEADER:
-      McEthIp_CreateIpHeader(PayloadSize);
+      McEthIp_CreateIpHeader(McEth_Payload.WriteBufferSize);
       McEthIp_TransmitState = SEND_TCP_HEADER;
       break;
     case SEND_TCP_HEADER:
-      McEthIp_CreateTcpHeader(PayloadSize);
+      McEthIp_CreateTcpHeader(McEth_Payload.WriteBufferSize);
       McEthIp_TransmitState = SEND_PAYLOAD;
       break;
 
     case SEND_PAYLOAD:
-      McEthIp_CreatePayload(DataPayload, PayloadSize);
+      McEthIp_CreatePayload();
       McEthIp_TransmitState = SEND_PACKET;
       break;
 
@@ -597,6 +585,7 @@ void McEthIp_TcpReceivePacket(void)
       break;
 
     case ETH_READ_FAIL:
+      McEthIp_ReceiveState = ETH_RECEIVE_IDLE;
       break;
 
     default:
@@ -652,6 +641,59 @@ static void McEthIpUpdateTcpCheckSum(uint8* BytesArray, uint16 size)
   McEthIp_TcpHeader.CheckSum = (uint16)CheckSum;
 }
 
+
+/** \brief Calculate CheckSum of the Tcp Header in the PayLoad
+ * \param McEthUpdateTcpCheckSumPayload
+ * \return void
+ */
+static void McEthIpUpdateTcpCheckSumPayload(uint16 size)
+{
+  uint32 CheckSum = (uint32)McEthIp_TcpHeader.CheckSum;
+
+  if ((MC_ETHERNET_DMASIZE - McEth_Payload.WriteIndex) >= size)
+  {
+    /* Normal Case, size does not overflow */
+    for  (uint16 i = 0; i < size; i++)
+    {
+      CheckSum += McEth_Payload.Buffer[McEth_Payload.WriteIndex + i];
+
+      if (CheckSum > 0xFFFF)
+      {
+        CheckSum = (CheckSum & 0xFFFF) + 1;
+      }
+    }
+  }
+  else
+  {
+    /* In this case we know that the Write Bytes have been moved to
+     * index zero of the cyclic buffer. In this case we need to
+     * run the calculation till the max size and then till the rest of the bytes
+     * Keep in mind that the cyclic buffer values for the transmit of packets
+     * are stored in higher layer using again DMA, DMA stores bytes
+     * like the PayLoad buffer is a cyclic buffer
+     */
+    for (uint16 i = McEth_Payload.WriteIndex; i < MC_ETHERNET_DMASIZE; i++)
+    {
+      CheckSum += McEth_Payload.Buffer[i];
+
+      if (CheckSum > 0xFFFF)
+      {
+        CheckSum = (CheckSum & 0xFFFF) + 1;
+      }
+    }
+    size = size - (MC_ETHERNET_DMASIZE - McEth_Payload.WriteIndex);
+
+    for (uint16 i = 0; size; i++)
+    {
+      CheckSum += McEth_Payload.Buffer[i];
+
+      if (CheckSum > 0xFFFF)
+      {
+        CheckSum = (CheckSum & 0xFFFF) + 1;
+      }
+    }
+  }
+}
 
 
 /** \brief Calculate CheckSum of a message
@@ -761,7 +803,6 @@ void McEthIp_SendARP(uint8* DstIpAddress)
       break;
 
     case ETH_SUCCESS_SEND_ARP:
-      McEthIp_SendARPState = ETH_CREATE_ARP;
       break;
 
     default:

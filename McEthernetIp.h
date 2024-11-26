@@ -137,12 +137,11 @@ extern MCETHIP_ARP_RECEIVE_STATE McEthIp_GetARPState ;
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void McEthIp_Init(uint8* SrcMacAddress);
 void McEthIp_SetSrcIpAddress(uint8* IpAddress);
 void McEthIp_SetDstIpAddress(uint8* IpAddress);
 void McEthIp_GetSrcIpAddress(uint8* ptr);
 void McEthIp_GetDstIpAddress(uint8* ptr);
-void McEthIp_TcpTransmitPacket(uint8* DataPayload, uint16 PayloadSize);
+void McEthIp_TcpTransmitPacket(void);
 void McEthIp_TcpReceivePacket(void);
 void McEthIp_SendARP(uint8* DstIpAddress);
 void McEthIp_GetARP(void);

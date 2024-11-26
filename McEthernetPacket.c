@@ -156,8 +156,8 @@ static MCETH_PACKET McEth_MasterPacketReceive =
     RECEIVE_MESSAGE
 };
 
-IfxDma_Dma_Channel McEth_DmaTransmitPachetHandler;
-IfxDma_Dma_Channel McEth_DmaReceivePachetHandler;
+IfxDma_Dma_Channel McEth_DmaTransmitPacket;
+IfxDma_Dma_Channel McEth_DmaReceivePacket;
 
 static uint8 McEth_RxBuffer[2];
 uint8 McEth_Buf[2048];
@@ -169,7 +169,7 @@ MCETH_PAYLOAD McEth_Payload =
     .WriteIndex = 0,
     .Buffer = McEth_Buf,
     .WriteBufferSize = 0,
-    .ReadBufferSize = MC_ETHERNET_MAXFRAME
+    .ReadBufferSize = 0
 };
 
 static volatile boolean McEth_WriteSuccess = FALSE;
@@ -224,7 +224,7 @@ void McEthIp_DmaTransmitIsr(void)
 
 static inline void McEth_UpdateWriteIndex(uint16 size)
 {
-  McEth_Payload.WriteIndex = (McEth_Payload.WriteIndex + size) % MC_ETHERNET_MAXFRAME;
+  McEth_Payload.WriteIndex = (McEth_Payload.WriteIndex + size) % MC_ETHERNET_DMASIZE;
   McEth_ReadSuccess = FALSE;
 }
 
@@ -233,13 +233,13 @@ static inline void McEth_UpdateReadIndex(void)
 {
   if (McEth_ReceiveBytesNum > MC_ETHERNET_DATASIZE)
   {
-    McEth_Payload.ReadIndex = (McEth_Payload.ReadIndex  + MC_ETHERNET_DATASIZE) %  MC_ETHERNET_MAXFRAME;
+    McEth_Payload.ReadIndex = (McEth_Payload.ReadIndex  + MC_ETHERNET_DATASIZE) %  MC_ETHERNET_DMASIZE;
   }
   else
   {
-    McEth_Payload.ReadIndex = (McEth_Payload.ReadIndex + McEth_ReceiveBytesNum) % MC_ETHERNET_MAXFRAME;
+    McEth_Payload.ReadIndex = (McEth_Payload.ReadIndex + McEth_ReceiveBytesNum) % MC_ETHERNET_DMASIZE;
   }
-  McEth_Payload.WriteIndex = (McEth_Payload.ReadIndex + 1) % MC_ETHERNET_MAXFRAME;
+  McEth_Payload.WriteIndex = (McEth_Payload.ReadIndex + 1) % MC_ETHERNET_DMASIZE;
 }
 
 
@@ -271,11 +271,11 @@ static inline void McEth_UpdateReadIndex(void)
  */
 void McEth_Init(uint8* MacAddress)
 {
-  McEth_DmaTransmitPachetHandler.channelId = IfxDma_ChannelId_0;
-  McEth_DmaReceivePachetHandler.channelId = IfxDma_ChannelId_1;
+  McEth_DmaTransmitPacket.channelId = IfxDma_ChannelId_0;
+  McEth_DmaReceivePacket.channelId = IfxDma_ChannelId_1;
   /* Initialize the Source and Destination to be the same  then it will change in the next transaction */
-  Dma_Init(&McEth_DmaTransmitPachetHandler, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_TRANSMIT_PRIORITY,IfxDma_ChannelIncrementCircular_2048, IfxDma_ChannelIncrementCircular_none);
-  Dma_Init(&McEth_DmaReceivePachetHandler, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_RECEIVE_PRIORITY, IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelIncrementCircular_2048);
+  Dma_Init(&McEth_DmaTransmitPacket, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_TRANSMIT_PRIORITY,IfxDma_ChannelIncrementCircular_2048, IfxDma_ChannelIncrementCircular_none);
+  Dma_Init(&McEth_DmaReceivePacket, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_RECEIVE_PRIORITY, IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelIncrementCircular_2048);
 
   uint8 tmp;
   Ifx_TickTime delay100ms = IfxStm_getTicksFromMilliseconds(BSP_DEFAULT_TIMER,100);
@@ -826,11 +826,11 @@ void McEth_ReadReceivedPayload(uint8* ReceivePtr, uint16 ReceivePtrSize)
   /* Read the Actual Packet */
   McEth_ReadPayload(ReceivePtrSize);
 
-  IfxDma_Dma_setChannelTransferCount(&McEth_DmaReceivePachetHandler, ReceivePtrSize);
+  IfxDma_Dma_setChannelTransferCount(&McEth_DmaReceivePacket, ReceivePtrSize);
   /* We choose the next index since we don't read at the same time we write with SPI during the first byte */
-  Dma_SetSourceAddress (&McEth_DmaReceivePachetHandler, Spi_ReturnSpiRxBufferAddr(1));
-  Dma_SetDestinationAddress(&McEth_DmaReceivePachetHandler, (uint32)ReceivePtr);
-  Dma_Transfer(&McEth_DmaReceivePachetHandler);
+  Dma_SetSourceAddress (&McEth_DmaReceivePacket, Spi_ReturnSpiRxBufferAddr(1));
+  Dma_SetDestinationAddress(&McEth_DmaReceivePacket, (uint32)ReceivePtr);
+  Dma_Transfer(&McEth_DmaReceivePacket);
   /* Wait till transmittion complete */
   while(McEth_ReadSuccess == FALSE)
   {}
@@ -990,10 +990,10 @@ static void McEth_WritePayload(uint8* Command, uint16 CommandSize)
   }
   McEth_WriteChunkSize = CommandSize;
   Spi_SetTxBufferIndex(MC_ETHERNET_WRITEBUFFER, 0);
-  IfxDma_Dma_setChannelTransferCount(&McEth_DmaTransmitPachetHandler, CommandSize);
-  Dma_SetSourceAddress (&McEth_DmaTransmitPachetHandler, (uint32)(&Command[McEth_Payload.WriteIndex]));
-  Dma_SetDestinationAddress(&McEth_DmaTransmitPachetHandler, Spi_ReturnSpiTxBufferAddr(1));
-  Dma_Transfer(&McEth_DmaTransmitPachetHandler);
+  IfxDma_Dma_setChannelTransferCount(&McEth_DmaTransmitPacket, CommandSize);
+  Dma_SetSourceAddress (&McEth_DmaTransmitPacket, (uint32)(&Command[McEth_Payload.WriteIndex]));
+  Dma_SetDestinationAddress(&McEth_DmaTransmitPacket, Spi_ReturnSpiTxBufferAddr(1));
+  Dma_Transfer(&McEth_DmaTransmitPacket);
   /* Wait till transmittion complete */
   while(McEth_WriteSuccess == FALSE)
   {}
