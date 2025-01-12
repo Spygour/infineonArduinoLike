@@ -83,9 +83,6 @@ typedef struct
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
- void SpimasterTxMcp2515(void);
- void SpimasterRxMcp2515(void );
- void SpimasterErMcp2515(void);
 void Mcp2515_Init(void);
 void Mcp2515_ChangeRxMod(MCP2515_RECEIVE_MODE mode);
 void Mcp2515_SetBaudrate(MCP2515_BAUDRATE Baudrate);

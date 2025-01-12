@@ -95,7 +95,7 @@ void canIsrRxHandler(void)
 }
 
 /* Function to initialize MULTICAN module, nodes and message objects related for this application use case */
-void Can_InitNode0(void)
+void Can_InitNode0(uint32 Baudrate)
 {
     /* ==========================================================================================
      * CAN module configuration and initialization:
@@ -134,13 +134,13 @@ void Can_InitNode0(void)
     MultiCanNode0.canNodeConfig.rxPinMode = IfxPort_InputMode_pullUp;
     MultiCanNode0.canNodeConfig.txPin = &IfxMultican_TXD0_P20_8_OUT;
     MultiCanNode0.canNodeConfig.txPinMode = IfxPort_OutputMode_pushPull;
-    MultiCanNode0.canNodeConfig.pinDriver = IfxPort_PadDriver_cmosAutomotiveSpeed3;
-    MultiCanNode0.canNodeConfig.baudrate = 500000;
+    MultiCanNode0.canNodeConfig.pinDriver = IfxPort_PadDriver_cmosAutomotiveSpeed2;
+    MultiCanNode0.canNodeConfig.baudrate = Baudrate;
     IfxMultican_Can_Node_init(&MultiCanNode0.canSrcNode, &MultiCanNode0.canNodeConfig);
 }
 
 
-void Can_InitTransmitMsgObj(uint32 CanId, uint32 ExtendedId , uint8 CanDataLength, boolean extended )
+void Can_InitTransmitMsgObj(uint32 CanId, uint32 ExtendedId , uint16 CanDataLength, boolean extended)
 {
   if (CanDataLength > 8)
   {
@@ -201,41 +201,19 @@ void Can_InitReceiveMsgObj(uint32 CanId)
 /* Function to initialize both TX and RX messages with the default data values.
  * After initialization of the messages, the TX message will be transmitted.
  */
-void Can_TransmitMsg(uint8* Msg, uint8 size)
+void Can_TransmitMsg(uint32* Msg, uint8 size)
 {
   uint32 dataLow = 0;
   uint32 dataHigh = 0;
-  uint8 CanDataCounter = 0;
-  boolean ParseLow = FALSE;
-  if (size > 4)
+
+  if (size < 2)
   {
-    CanDataCounter = (size -1) - 4;
+    dataLow = Msg[0];
   }
   else
   {
-    CanDataCounter = (size - 1);
-    ParseLow = TRUE;
-  }
-
-  for (uint8 i = 0; i < size; i++)
-  {
-    if (ParseLow == TRUE)
-    {
-      dataLow = dataLow | ((uint32)Msg[i] << (CanDataCounter*8));
-    }
-    else
-    {
-      dataHigh = dataHigh | ((uint32)Msg[i] << (CanDataCounter*8));
-    }
-    if (CanDataCounter == 0)
-    {
-      CanDataCounter = 3;
-      ParseLow = TRUE;
-    }
-    else
-    {
-      CanDataCounter -= 1;
-    }
+    dataLow = Msg[0];
+    dataHigh = Msg[size - 1];
   }
   /* Initialization of the TX message */
   IfxMultican_Message_init(&MultiCanNode0.txMsg,
@@ -246,8 +224,5 @@ void Can_TransmitMsg(uint8* Msg, uint8 size)
 
   /* Send the CAN message with the previously defined TX message content */
 
-  while (  IfxMultican_Status_notSentBusy ==  IfxMultican_Can_MsgObj_sendMessage(&MultiCanNode0.canSrcMsgObj, &MultiCanNode0.txMsg) )
-  {
-
-  }
+  while (  IfxMultican_Status_notSentBusy ==  IfxMultican_Can_MsgObj_sendMessage(&MultiCanNode0.canSrcMsgObj, &MultiCanNode0.txMsg) ) {}
 }

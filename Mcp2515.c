@@ -37,7 +37,7 @@
 #define WRITE_COMMAND 2
 #define READ_COMMAND 3
 #define BIT_MODIFY 5
-#define MCP2515_SPIBAUDRATE 10000000.0
+#define MCP2515_SPIBAUDRATE 10000000.
 
 /* Can Transmit Registers */
 #define CNF1      0x2A
@@ -356,8 +356,27 @@ static inline void Mcp2515_BitModifyReg(uint8 Register, uint8 Mask, uint8 Value)
 
 static inline void Mcp2515_ReadRegister(uint8 Register, uint8 RegsNum)
 {
-  uint8 SpiBuffer[2] = {READ_COMMAND, Register};
-  Spi_ReadBytes(&Mcp2515Channel, SpiBuffer, 2, Mcp2515ReadBuffer, RegsNum);
+  static uint8 SpiRxBuffer[100];
+  uint8 SpiTxBuffer[2] = {READ_COMMAND, Register};
+  Spi_ReadBytes(&Mcp2515Channel, SpiTxBuffer, 2, SpiRxBuffer, RegsNum+2);
+
+  for (uint8 i = 0; i < RegsNum; i++)
+  {
+    Mcp2515ReadBuffer[i] = SpiRxBuffer[i+1];
+  }
+}
+
+
+static inline void Mcp2515_ReadBuffer(uint8 bufferNumber,uint8 bytes)
+{
+  uint8 SpiTxBuffer = 0x90 | (bufferNumber << 2) ;
+  uint8 Mcp2515ReadBuffertmp[13];
+  Spi_ReadBytes(&Mcp2515Channel, &SpiTxBuffer, 1, Mcp2515ReadBuffertmp, bytes+5);
+  for (uint8 i = 0; i < bytes; i++)
+  {
+    /* We skip number of bytes and can id */
+    Mcp2515ReadBuffer[i] = Mcp2515ReadBuffertmp[i + 5];
+  }
 }
 
 
@@ -586,7 +605,7 @@ static inline boolean Mcp2515_ReadRxBuf0(void)
   /* Read Number of bytes received */
   Mcp2515_ReadRegister(RXB0DLC, 1);
   RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
-  Mcp2515_ReadRegister(RXB0DM , RxSize);
+  Mcp2515_ReadBuffer(0 , RxSize);
 
   for (uint8 i = 0; i < RxSize; i++)
   {
@@ -613,7 +632,7 @@ static inline boolean Mcp2515_ReadRxBuf1(void)
     BufferIndex = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | 0x1);
     Mcp2515_ReadRegister(RXB1DLC, 1);
     RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
-    Mcp2515_ReadRegister(RXB1DM , RxSize);
+    Mcp2515_ReadBuffer(1 , RxSize);
 
     for (uint8 i = 0; i < RxSize; i++)
     {
@@ -661,7 +680,7 @@ static inline boolean Mcp2515_ReadAnyMsg(void)
       RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
 
       /* Read Rx Buffer */
-      Mcp2515_ReadRegister(RXB0DM , RxSize);
+      Mcp2515_ReadBuffer(0 , RxSize);
       for (uint8 i = 0; i < RxSize; i++)
       {
         Mcp2515ReceiveRes.CanReceivedMsg[ Mcp2515ReceiveRes.CanReceiveMsgIndex ].ReceiveMsg[ i ] = Mcp2515ReadBuffer[ i ];
@@ -693,7 +712,7 @@ static inline boolean Mcp2515_ReadAnyMsg(void)
       RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
 
       /* Read Rx buffer */
-      Mcp2515_ReadRegister(RXB0DM , RxSize);
+      Mcp2515_ReadBuffer(0 , RxSize);
 
 
       for (uint8 i = 0; i < RxSize; i++)
@@ -727,7 +746,7 @@ static inline boolean Mcp2515_ReadAnyMsg(void)
       RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
 
       /* Read RxBuffer */
-      Mcp2515_ReadRegister(RXB1DM , RxSize);
+      Mcp2515_ReadBuffer(1 , RxSize);
 
 
       for (uint8 i = 0; i < RxSize; i++)
@@ -760,7 +779,7 @@ static inline boolean Mcp2515_ReadAnyMsg(void)
       RxSize = Mcp2515ReadBuffer[0] & ((0x1 << 3) | (0x1 << 2) | (0x1 << 1) | (0x1));
 
       /* Read RxBuffer */
-      Mcp2515_ReadRegister(RXB1DM , RxSize);
+      Mcp2515_ReadBuffer(1, RxSize);
 
 
       for (uint8 i = 0; i < RxSize; i++)
