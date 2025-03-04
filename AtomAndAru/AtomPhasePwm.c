@@ -30,7 +30,7 @@
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "AtomPhasePwm.h"
+#include "../InfineonArduinoLike/AtomAndAru/AtomPhasePwm.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -262,7 +262,7 @@ boolean IfxGtm_AtomPwmThreeTimersInit(IfxGtm_Atom_PwmHl *driver, IfxGtm_Atom_Pwm
 /*Main function of the Three timers Phase shift PWM*/
 void AtomPhasePwm_Init(float32 baseFrequency,uint32 phaseShift,IfxGtm_Atom_ToutMap* masterPin, IfxGtm_Atom_ToutMapP* slavePins)
 {
-  IfxGtm_Cmu_Clk ClckSrc= IfxGtm_Cmu_Clk_0;
+  IfxGtm_Cmu_Clk ClckSrc= IfxGtm_Cmu_Clk_1;
   float32 frequency;
   /* Enable GTM, it is necessary if the GTM is not initialized earlier */
   IfxGtm_enable(&MODULE_GTM);
@@ -273,7 +273,7 @@ void AtomPhasePwm_Init(float32 baseFrequency,uint32 phaseShift,IfxGtm_Atom_ToutM
   /* Set the CMU CLK0 */
   IfxGtm_Cmu_setClkFrequency(&MODULE_GTM, ClckSrc, frequency);
   /* Enable the FXU clock */
-  IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_CLK0);
+  IfxGtm_Cmu_enableClocks(&MODULE_GTM, IFXGTM_CMU_CLKEN_CLK1);
   IfxGtm_Atom_Timer_Config TimerConfig;                                        /* Timer configuration              */
   IfxGtm_Atom_Timer_initConfig(&TimerConfig, &MODULE_GTM);                     /* Initialize timer configuration   */
 
