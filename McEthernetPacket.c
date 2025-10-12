@@ -119,8 +119,8 @@ SpiChannelConfig McEthChannelCfg = {
     &IfxQspi1_SLSO5_P11_2_OUT,
     MC_ETHERNET_SPIBAUDRATE,
     0,
-    SpiIf_ShiftClock_shiftTransmitDataOnTrailingEdge,
-    SpiIf_DataHeading_msbFirst
+    TRUE,
+    TRUE
 };
 
 /* Definition of the Ethernet packet specific parts */
@@ -274,8 +274,8 @@ void McEth_Init(uint8* MacAddress)
   McEth_DmaTransmitPacket.channelId = IfxDma_ChannelId_0;
   McEth_DmaReceivePacket.channelId = IfxDma_ChannelId_1;
   /* Initialize the Source and Destination to be the same  then it will change in the next transaction */
-  Dma_Init(&McEth_DmaTransmitPacket, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_TRANSMIT_PRIORITY,IfxDma_ChannelIncrementCircular_2048, IfxDma_ChannelIncrementCircular_none);
-  Dma_Init(&McEth_DmaReceivePacket, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_RECEIVE_PRIORITY, IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelIncrementCircular_2048);
+  Dma_Init(&McEth_DmaTransmitPacket, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_TRANSMIT_PRIORITY,IfxDma_ChannelIncrementCircular_2048, IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelMoveSize_8bit);
+  Dma_Init(&McEth_DmaReceivePacket, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Buf[0]), (uint32)(&McEth_Buf[0]), DMA_ETH_RECEIVE_PRIORITY, IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelIncrementCircular_2048, IfxDma_ChannelMoveSize_8bit);
 
   uint8 tmp;
   Ifx_TickTime delay100ms = IfxStm_getTicksFromMilliseconds(BSP_DEFAULT_TIMER,100);

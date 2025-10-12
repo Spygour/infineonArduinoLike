@@ -110,8 +110,8 @@ SpiChannelConfig McpChannelCfg = {
     &IfxQspi1_SLSO5_P11_2_OUT,
     MCP2515_SPIBAUDRATE,
     0,
-    SpiIf_ShiftClock_shiftTransmitDataOnTrailingEdge,
-    SpiIf_DataHeading_msbFirst
+    TRUE,
+    TRUE
 };
 
 uint8 Mcp2515ReadBuffer[30];
@@ -276,27 +276,27 @@ void Mcp2515_SetBaudrate(MCP2515_BAUDRATE Baudrate)
   switch (Mcp2515Baudrate)
   {
     case KBPS_125:
-      CNF1cmd = 0x07;
-      CNF2cmd = 0xB1;
-      CNF3cmd = 0x85;
+      CNF1cmd = 0x01;
+      CNF2cmd = 0x91;
+      CNF3cmd = 0x03;
       break;
 
     case KBPS_250:
       CNF1cmd = 0x00;
-      CNF2cmd = 0xB1;
-      CNF3cmd = 0x85;
+      CNF2cmd = 0x91;
+      CNF3cmd = 0x03;
       break;
 
     case KBPS_500:
       CNF1cmd = 0x00;
-      CNF2cmd = 0x90;
-      CNF3cmd = 0x82;
+      CNF2cmd = 0x91;
+      CNF3cmd = 0x03;
       break;
 
     case KBPS_1000:
       CNF1cmd = 0x00;
-      CNF2cmd = 0x80;
-      CNF3cmd = 0x80;
+      CNF2cmd = 0x81;
+      CNF3cmd = 0x01;
       break;
 
     default:

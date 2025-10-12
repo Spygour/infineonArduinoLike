@@ -1,5 +1,5 @@
 /**********************************************************************************************************************
- * \file Spi.h
+ * \file std_int.c
  * \copyright Copyright (C) Infineon Technologies AG 2019
  * 
  * Use of this file is subject to the terms of use agreed between (i) you or the company in which ordinary course of 
@@ -25,60 +25,19 @@
  * IN THE SOFTWARE.
  *********************************************************************************************************************/
 
-#ifndef INFINEONARDUINOLIKE_SPI_H_
-#define INFINEONARDUINOLIKE_SPI_H_
 
 /*********************************************************************************************************************/
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
-#include "IfxQspi_SpiMaster.h"
-#include "IfxQspi_SpiSlave.h"
-#include "Ifx_Types.h"
+#include "std_int.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-typedef struct
-{
-    const IfxQspi_Slso_Out* ChannelOutput;
-    float32                Baudrate;
-    boolean       ClockPolarity;
-    boolean       ShiftClock;
-    boolean      DataHeading;
-}SpiChannelConfig;
 
-typedef IfxQspi_SpiMaster SpiMaster_t;
-typedef IfxQspi_SpiMaster_Channel SpiChannel_t;
-typedef struct
-{
-    IfxQspi_Sclk_Out* SpiClk;
-    IfxQspi_Mtsr_Out* SpiMosi;
-    IfxQspi_Mrst_In*  SpiMiso;
-}SpiMasterPins_t;
-
-typedef struct
-{
-    SpiMaster_t*          SpiMasterPtr;
-    uint8                 TxIsr;
-    uint8                 RxIsr;
-    uint8                 ErIsr;
-    boolean               IsActive;
-}SpiMasterCfg_t;
-
-typedef struct
-{
-    IfxQspi_Sclk_In*  SpiClkIn;
-    IfxQspi_Mtsr_In*  SpiMosi;
-    IfxQspi_Mrst_Out* SpiMiso;
-    IfxQspi_Slsi_In*  SpiChipSelect;
-}SpiSlavePins_t;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
 
-/*********************************************************************************************************************/
-/*-------------------------------------------------Data Structures---------------------------------------------------*/
-/*********************************************************************************************************************/
- 
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -86,19 +45,165 @@ typedef struct
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void Spi_Init(SpiMasterPins_t* SpiMasterPins, SpiMasterCfg_t* MasterCfg);
-void Spi_ChannelInit(SpiMasterCfg_t* SpiMasterCfg, SpiChannel_t* SpiChannel, SpiChannelConfig* ChannelConfig);
-void Spi_WriteRegister(SpiChannel_t* SpiChannel, uint8 Reg);
-void Spi_WriteRegisterVal(SpiChannel_t* SpiChannel, uint8 Reg, uint8 Val);
-void Spi_ReadRegister(SpiChannel_t* SpiChannel, uint8 Reg, uint8* regVal, uint16 size);
-void Spi_WriteBytes(SpiChannel_t* SpiChannel, uint8* Src, uint16 size);
-void Spi_ReadBytes(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint8* Dest, uint16 DestSize);
-void Spi_WriteBuffer(SpiChannel_t* SpiChannel, uint16 size);
-void Spi_ReadBuffer(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint16 size);
-uint32 Spi_ReturnSpiTxBufferAddr(uint16 index);
-uint32 Spi_ReturnSpiRxBufferAddr(uint16 index);
-void Spi_SetTxBufferIndex(uint8 val, uint8 index);
-void Spi_SlaveInit(IfxQspi_SpiSlave* SpiSlave,SpiSlavePins_t* SpiSlavePins, SpiChannelConfig* ChannelConfig);
-void Spi_SlaveExchange(IfxQspi_SpiSlave* SpiSlave, uint8* SpiSlaveTx, uint8* SpiSlaveRx, uint16 size);
 
-#endif /* INFINEONARDUINOLIKE_SPI_H_ */
+/*********************************************************************************************************************/
+/*---------------------------------------------Function Implementations----------------------------------------------*/
+/*********************************************************************************************************************/
+void memcpy(void* src, void* dst, uint16 size)
+{
+  uint32 src_addr = (uint32)src;
+  uint32 dst_addr = (uint32)dst;
+  uint16 count;
+  uint16 mod = size % 4;
+  if ( ( (src_addr % 4)==0) &&  ((dst_addr % 4) == 0))
+  {
+    uint32 *src32 = (uint32*)src;
+    uint32 *dst32 = (uint32*)dst;
+    count = size;
+    while(count--)
+    {
+      *dst32++ = *src32++;
+    }
+  }
+  else if ( ( (src_addr % 4)==2) && ( (dst_addr % 4)==2) && (mod == 2) )
+  {
+    if (mod == 0)
+    {
+      uint32 *src32 = (uint32*)src;
+      uint32 *dst32 = (uint32*)dst;
+      count = size >> 1;
+      while(count--)
+      {
+        *dst32++ = *src32++;
+      }
+    }
+    else
+    {
+      uint16 *src16 = (uint16*)src;
+      uint16 *dst16 = (uint16*)dst;
+      uint16 count = size;
+      while(count--)
+      {
+        *dst16++ = *src16++;
+      }
+    }
+  }
+
+  else
+  {
+    if (mod == 0)
+    {
+      uint32 *src32 = (uint32*)src;
+      uint32 *dst32 = (uint32*)dst;
+      count = size >> 2;
+      while(count--)
+      {
+        *dst32++ = *src32++;
+      }
+    }
+    else if (mod == 2)
+    {
+      uint16 *src16 = (uint16*)src;
+      uint16 *dst16 = (uint16*)dst;
+      uint16 count = size >> 1;
+      while(count--)
+      {
+        *dst16++ = *src16++;
+      }
+    }
+    else
+    {
+      uint8 *src8 = (uint8*)src;
+      uint8 *dst8 = (uint8*)dst;
+      uint16 count = size;
+      while(count--)
+      {
+        *dst8++ = *src8++;
+      }
+    }
+  }
+}
+
+
+void memset_var(void* dst, void* val , uint16 size)
+{
+  uint32 src_addr = (uint32)dst;
+  uint32 dst_addr = (uint32)val;
+  uint16 count;
+  uint16 mod = size % 4;
+  if ((src_addr % 4)!=(dst_addr % 4))
+  {
+    return;
+  }
+
+  if ( ( (src_addr % 4)==0) &&  ((dst_addr % 4) == 0))
+  {
+    uint32 *dst32 = (uint32*)dst;
+    uint32 val32 = *(uint32*)val;
+    count = size;
+    while(count--)
+    {
+      *dst32++ = val32;
+    }
+  }
+  else if ( ( (src_addr % 4)==2) && ( (dst_addr % 4)==2) )
+  {
+    if (mod == 0)
+    {
+      uint32 *dst32 = (uint32*)dst;
+      uint16 val16 = *(uint16*)val;
+      uint32 val32 = ((uint32)val16 << 16) | (uint32)val16;
+      count = size >> 1;
+      while(count--)
+      {
+        *dst32++ = val32;
+      }
+    }
+    else
+    {
+      uint16 *dst16 = (uint16*)dst;
+      uint16 val16 = *(uint16*)val;
+      uint16 count = size;
+      while(count--)
+      {
+        *dst16++ = val16;
+      }
+    }
+  }
+
+  else
+  {
+    if (mod == 0)
+    {
+      uint32 *dst32 = (uint32*)dst;
+      uint8 val8 = *(uint8*)val;
+      uint32 val32 = ((uint32)val8 << 24) | ((uint32)val8 << 16) | ((uint32)val8 << 8) | (uint32)val8;
+      count = size >> 2;
+      while(count--)
+      {
+        *dst32++ = val32++;
+      }
+    }
+    else if (mod == 2)
+    {
+      uint16 *dst16 = (uint16*)dst;
+      uint8 val8 = *(uint8*)val;
+      uint16 val16 = ((uint16)val8 << 8) | (uint16)val8;
+      uint16 count = size >> 1;
+      while(count--)
+      {
+        *dst16++ = val16;
+      }
+    }
+    else
+    {
+      uint8 *dst8 = (uint8*)dst;
+      uint8 val8 = *(uint8*)val;
+      uint16 count = size;
+      while(count--)
+      {
+        *dst8++ = val8;
+      }
+    }
+  }
+}

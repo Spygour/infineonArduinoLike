@@ -51,8 +51,10 @@
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc, IfxDma_ChannelIncrementCircular DstCirc);
+void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint16 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc, IfxDma_ChannelIncrementCircular DstCirc,IfxDma_ChannelMoveSize moveSize );
 void Dma_Transfer(IfxDma_Dma_Channel* DmaChannel);
 void Dma_SetSourceAddress(IfxDma_Dma_Channel* DmaChannel,  uint32 SourceAddress);
 void Dma_SetDestinationAddress(IfxDma_Dma_Channel* DmaChannel,  uint32 DestinationAddress);
+void Dma_InitDaisyChain(IfxDma_Dma_Channel* DmaChannel,  uint16 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc, IfxDma_ChannelIncrementCircular DstCirc,IfxDma_ChannelMoveSize moveSize );
+void Dma_InitDaisyChainMaster(IfxDma_Dma_Channel* DmaChannel,  uint16 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc, IfxDma_ChannelIncrementCircular DstCirc,IfxDma_ChannelMoveSize moveSize );
 #endif /* INFINEONARDUINOLIKE_DMA_H_ */

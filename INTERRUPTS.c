@@ -110,6 +110,7 @@ static inline void setAtomConfig(float32 frequency, uint16 priority,uint16 atom,
   atomConfig.initPins       = TRUE;
 }
 
+
 static inline void setTomPwm(IfxGtm_Tom_ToutMap* pin,Ifx_GTM *GTM)
 {
   tomPwmTimerConfig.base.frequency       = 100;
@@ -366,4 +367,3 @@ void AtomTimer_SetDutyCycleAct(IfxGtm_Atom_Timer *myatomtimer, uint32 DutyCycle)
   IfxGtm_Atom_Ch_setCompareOneShadow(myatomtimer->atom, myatomtimer->timerChannel, DutyCycle);
   IfxGtm_Atom_Timer_applyUpdate(myatomtimer);
 }
-

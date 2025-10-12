@@ -31,12 +31,17 @@
 /*-----------------------------------------------------Includes------------------------------------------------------*/
 /*********************************************************************************************************************/
 #include "../InfineonArduinoLike/AtomAndAru/AtomPhaseSerial.h"
+#include "../InfineonArduinoLike/Dma.h"
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
-#define MAX_ATOM_CHANNELS           3
-#define MASTER_TIMER_ISR            3
+#define MAX_ATOM_CHANNELS           4
+#define  MOSI_CHANNELS              3
+#define MASTER_TIMER_ISR            18
+#define QUAD_SPI_DMA_ISR            16
 #define ATOM_BITSHIFT               15
+#define QUAD_SPI_BUFFER_SIZE        128
+#define QAUD_SPI_FILLLEVEL          64
 
 
 
@@ -57,11 +62,49 @@ typedef struct
 
 static Serial_Timers_Output AtomPhaseSerial_Output;
 
-volatile ATOMPHASESERIAL_STATE AtomPhaseSerial_State = ATOM_SPI_WAIT;
+volatile boolean AtomPhaseSerial_SpiEnd = TRUE;
+
+
+static uint8 AtomPhaseSerial_RingBufferSize = 0;
+
+IfxDma_Dma_Channel AtomPhaseSerial_DmaChannel[MOSI_CHANNELS];
+
+IfxDma_Dma_Channel AtomPhaseSerial_DataChannel[MOSI_CHANNELS];
+
+static uint16 AtomPhaseSerial_TxSpiBuffer_Ch1[QUAD_SPI_BUFFER_SIZE];
+static uint16 AtomPhaseSerial_TxSpiBuffer_Ch2[QUAD_SPI_BUFFER_SIZE];
+static uint16 AtomPhaseSerial_TxSpiBuffer_Ch3[QUAD_SPI_BUFFER_SIZE];
+
+static ATOMPHASESERIAL_SPIBUFFER AtomPhaseSerial_TxBuffer[MOSI_CHANNELS] =
+{
+    AtomPhaseSerial_TxSpiBuffer_Ch1,
+    AtomPhaseSerial_TxSpiBuffer_Ch2,
+    AtomPhaseSerial_TxSpiBuffer_Ch3
+};
+
+ATOMPHASESERIAL_RINGBUFFER AtomPhaseSerial_Buffer =
+{
+    AtomPhaseSerial_TxBuffer,
+    &AtomPhaseSerial_RingBufferSize
+};
+
+static ATOMPHASESERIAL_MOSIREGS AtomPhaseSerial_MosiChannels[MOSI_CHANNELS] =
+{
+    NULL_PTR,
+    NULL_PTR,
+    NULL_PTR
+};
+
+static ATOMPHASESERIAL_MOSIREGS AtomPhaseSerial_ChipSelect = NULL_PTR;
+
+
+volatile uint32 AtomPhaseSerial_DataRemain = 0;
+volatile uint8 AtomPhaseSerial_DataIndex = 0;
 
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
+IFX_STATIC void IfxGtmAtomSerialUpdate(IfxGtm_Atom_PwmHl *driver, Ifx_TimerValue *tOn);
 
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
@@ -69,40 +112,63 @@ volatile ATOMPHASESERIAL_STATE AtomPhaseSerial_State = ATOM_SPI_WAIT;
 IFX_INTERRUPT(AtomPhaseSerial_Isr,0, MASTER_TIMER_ISR);
 void AtomPhaseSerial_Isr(void)
 {
-  switch (AtomPhaseSerial_State)
+  IfxGtm_Atom_Timer_acknowledgeTimerIrq(&AtomPhaseSerial_Output.timer);
+  if (!AtomPhaseSerial_SpiEnd)
   {
-    case ATOM_SPI_WAIT:
+    switch (AtomPhaseSerial_DataRemain)
     {
-      /* Do nothing */
-      break;
-    }
+      default:
+      {
+        IfxDma_startChannelTransaction(AtomPhaseSerial_DataChannel[0].dma,
+                                       AtomPhaseSerial_DataChannel[0].channelId);
+        AtomPhaseSerial_DataRemain--;
+        break;
+      }
 
-    case ATOM_SPI_START:
-    {
-      IfxGtm_Atom_Timer_run(&AtomPhaseSerial_Output.SpiClk);
-      IfxGtm_Atom_Timer_disableUpdate(&AtomPhaseSerial_Output.SpiClk); /* Disable the update of Spi Timer */
-      IfxGtm_Atom_Ch_setCompareShadow(AtomPhaseSerial_Output.SpiClk.atom, AtomPhaseSerial_Output.SpiClk.triggerChannel, (3*AtomPhaseSerial_Output.spiPeriod) >> 2,  AtomPhaseSerial_Output.spiPeriod >> 2);
-      IfxGtm_Atom_Timer_applyUpdate(&AtomPhaseSerial_Output.SpiClk);  /* Start every PWM signal at the same time */
-      AtomPhaseSerial_State =  ATOM_SPI_RUN;
-      break;
-    }
-
-    case ATOM_SPI_END:
-    {
-      /* Do nothing */
-      IfxGtm_Atom_Timer_stop(&AtomPhaseSerial_Output.SpiClk);
-      AtomPhaseSerial_State = ATOM_SPI_WAIT;
-      break;
-    }
-
-    default:
-    {
-      break;
+      case 0:
+      {
+        /* Prepare the chip select */
+        AtomPhaseSerial_ChipSelect->SR1.U = 0xFFFF;
+        for (uint8 i = 0; i < MOSI_CHANNELS; i++)
+        {
+          AtomPhaseSerial_MosiChannels[i]->SR1.U = 0;
+        }
+        AtomPhaseSerial_SpiEnd = TRUE;
+        break;
+      }
     }
   }
+  else
+  {
+    IfxGtm_Atom_Timer_stop(&AtomPhaseSerial_Output.SpiClk);
+    IfxGtm_Atom_Timer_stop(&AtomPhaseSerial_Output.timer);
+  }
+
 }
 
-IFX_STATIC void IfxGtmTomSerialSetSpiClk(IfxGtm_Atom_ToutMap* SpiPin, IfxGtm_Cmu_Clk Clock, uint32 frequency)
+
+IFX_INTERRUPT(AtomPhaseSerial_DmaIsr, 0, QUAD_SPI_DMA_ISR);
+void AtomPhaseSerial_DmaIsr(void)
+{
+  /* Enable global Interrupts   */
+  IfxCpu_enableInterrupts();
+  /* Prepare the chip select */
+  AtomPhaseSerial_ChipSelect->SR1.U = 0x0;
+  IfxDma_startChannelTransaction(AtomPhaseSerial_DataChannel[0].dma,
+                                     AtomPhaseSerial_DataChannel[0].channelId);
+  AtomPhaseSerial_DataIndex++;
+  AtomPhaseSerial_DataRemain--;
+  IfxGtm_Atom_Timer_disableUpdate(&AtomPhaseSerial_Output.SpiClk);
+  IfxGtm_Atom_Timer_disableUpdate(&AtomPhaseSerial_Output.timer);
+  AtomPhaseSerial_SpiEnd =  FALSE;
+  IfxGtm_Atom_Timer_run(&AtomPhaseSerial_Output.timer);
+  IfxGtm_Atom_Timer_run(&AtomPhaseSerial_Output.SpiClk);
+  IfxGtm_Atom_Timer_applyUpdate(&AtomPhaseSerial_Output.SpiClk);
+  IfxGtm_Atom_Timer_applyUpdate(&AtomPhaseSerial_Output.timer);
+}
+
+
+IFX_STATIC void IfxGtmAtomSerialSetSpiClk(IfxGtm_Atom_ToutMap* SpiPin, IfxGtm_Cmu_Clk Clock, uint32 frequency)
 {
   IfxGtm_Atom_Timer_Config atomConfig;
 
@@ -112,10 +178,10 @@ IFX_STATIC void IfxGtmTomSerialSetSpiClk(IfxGtm_Atom_ToutMap* SpiPin, IfxGtm_Cmu
   atomConfig.base.minResolution              = 0;
   atomConfig.base.trigger.outputMode         = IfxPort_OutputMode_pushPull;
   atomConfig.base.trigger.outputDriver       = IfxPort_PadDriver_cmosAutomotiveSpeed1;
-  atomConfig.base.trigger.risingEdgeAtPeriod = FALSE;
+  atomConfig.base.trigger.risingEdgeAtPeriod = TRUE;
   atomConfig.base.trigger.outputEnabled      = TRUE;
   atomConfig.base.trigger.enabled            = TRUE;
-  atomConfig.base.trigger.triggerPoint       = 0;
+  atomConfig.base.trigger.triggerPoint       = 1;
   atomConfig.base.trigger.isrPriority        = 0;
   atomConfig.base.trigger.isrProvider        = IfxSrc_Tos_cpu0;
   atomConfig.base.countDir                   = IfxStdIf_Timer_CountDir_up;
@@ -131,11 +197,18 @@ IFX_STATIC void IfxGtmTomSerialSetSpiClk(IfxGtm_Atom_ToutMap* SpiPin, IfxGtm_Cmu
   atomConfig.initPins       = TRUE;
 
   IfxGtm_Atom_Timer_init(&AtomPhaseSerial_Output.SpiClk, &atomConfig);
+  /* Get the Spi Period */
+  IfxGtm_Atom_Timer_disableUpdate(&AtomPhaseSerial_Output.SpiClk);
+  AtomPhaseSerial_Output.spiPeriod = IfxGtm_Atom_Ch_getCompareZero(AtomPhaseSerial_Output.SpiClk.atom, AtomPhaseSerial_Output.SpiClk.triggerChannel);
+  IfxGtm_Atom_Ch_setCompareShadow(AtomPhaseSerial_Output.SpiClk.atom, AtomPhaseSerial_Output.SpiClk.triggerChannel,
+    (3*AtomPhaseSerial_Output.spiPeriod) >> 2, AtomPhaseSerial_Output.spiPeriod >> 2);
+    IfxGtm_Atom_Timer_applyUpdate(&AtomPhaseSerial_Output.SpiClk);
+  IfxGtm_Atom_Timer_applyUpdate(&AtomPhaseSerial_Output.SpiClk); /* Enable the update of SpiClock Timer */
 }
 
 
 /*This function sets default pwm signals for every phase*/
-IFX_STATIC void IfxGtmTomSerialUpdateOff(IfxGtm_Atom_PwmHl *driver, Ifx_TimerValue *tOn)
+IFX_STATIC void IfxGtmAtomSerialUpdateOff(IfxGtm_Atom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
   IFX_UNUSED_PARAMETER(tOn)
   uint8 ChannelIndex;
@@ -148,7 +221,7 @@ IFX_STATIC void IfxGtmTomSerialUpdateOff(IfxGtm_Atom_PwmHl *driver, Ifx_TimerVal
 }
 
 
-IFX_STATIC void IfxGtmTomSerialUpdatePeriod(IfxGtm_Atom_PwmHl *driver)
+IFX_STATIC void IfxGtmAtomSerialUpdatePeriod(IfxGtm_Atom_PwmHl *driver)
 {
   uint8 ChannelIndex;
   for (ChannelIndex = 0; ChannelIndex < driver->base.channelCount; ChannelIndex++)
@@ -166,27 +239,40 @@ void IfxGtm_AtomSerialThreeTimersSetOnTime(IfxGtm_Atom_PwmHl *driver, Ifx_TimerV
 
 
 /*This function Starts the three phase pwm signals*/
-IFX_STATIC void IfxGtmTomSerialUpdate(IfxGtm_Atom_PwmHl *driver, Ifx_TimerValue *tOn)
+IFX_STATIC void IfxGtmAtomSerialUpdate(IfxGtm_Atom_PwmHl *driver, Ifx_TimerValue *tOn)
 {
   uint8          channelIndex;
   Ifx_TimerValue period;
 
   period = driver->timer->base.period;
 
-  for (channelIndex = 0; channelIndex < driver->base.channelCount; channelIndex++)
+  for (channelIndex = 1; channelIndex < driver->base.channelCount; channelIndex++)
   {
     IfxGtm_Atom_Ch_setCompareOneShadow(driver->atom, driver->ccxTemp[channelIndex],
-        tOn[channelIndex]);
+        tOn[channelIndex] << 6);
   }
 }
 
 /*This pointer of structures has the different modes of the three phase signals, at first we use the configuration of
- * IfxGtmTomSerialchModes[1] structure and then the configuration of IfxGtmTomSerialchModes[0] structure*/
-IFX_STATIC IFX_CONST IfxGtm_Atom_Serial IfxGtmTomSerialchModes[2] = {
-    {Ifx_Pwm_Mode_centerAligned,         FALSE, &IfxGtmTomSerialUpdate  },
-    {Ifx_Pwm_Mode_off,                   FALSE, &IfxGtmTomSerialUpdateOff   }
+ * IfxGtmAtomSerialchModes[1] structure and then the configuration of IfxGtmAtomSerialchModes[0] structure*/
+IFX_STATIC IFX_CONST IfxGtm_Atom_Serial IfxGtmAtomSerialchModes[2] = {
+    {Ifx_Pwm_Mode_centerAligned,         FALSE, &IfxGtmAtomSerialUpdate  },
+    {Ifx_Pwm_Mode_off,                   FALSE, &IfxGtmAtomSerialUpdateOff   }
     /*To add two more modes*/
 };
+
+
+IFX_STATIC void IfxGtmAtomStoreSrRegs(IfxGtm_Atom_PwmHl *driver)
+{
+  /* Get the Chip Select Register */
+  AtomPhaseSerial_ChipSelect = IfxGtm_Atom_Ch_getChannelPointer(driver->atom, driver->ccx[0]);
+
+  /* Get the Mosi Registers */
+  for(uint8 channelIndex = 1; channelIndex < driver->base.channelCount; channelIndex++)
+  {
+    AtomPhaseSerial_MosiChannels[channelIndex - 1] = IfxGtm_Atom_Ch_getChannelPointer(driver->atom, driver->ccx[channelIndex]);
+  }
+}
 
 
 /*This function sets the mode of the three phase pwm signals*/
@@ -194,6 +280,7 @@ boolean IfxGtm_AtomSerialThreeTimersSetMode(IfxGtm_Atom_PwmHl *driver, Ifx_Pwm_M
 {
     boolean                Result = TRUE;
     IfxGtm_Atom_PwmHl_Base *Base   = &driver->base;
+    IfxGtm_Atom_Ch Channel;
 
     if (Base->mode != mode)
     {
@@ -206,7 +293,7 @@ boolean IfxGtm_AtomSerialThreeTimersSetMode(IfxGtm_Atom_PwmHl *driver, Ifx_Pwm_M
         IFX_ASSERT(IFX_VERBOSE_LEVEL_ERROR, mode == IfxGtm_Atom_Pwmccx_modes[mode].mode);
 
         Base->mode             = mode;
-        AtomPhaseSerial_Output.update         = IfxGtmTomSerialchModes[0];
+        AtomPhaseSerial_Output.update         = IfxGtmAtomSerialchModes[0];
 
             driver->ccxTemp   = driver->ccx;
 
@@ -221,11 +308,9 @@ boolean IfxGtm_AtomSerialThreeTimersSetMode(IfxGtm_Atom_PwmHl *driver, Ifx_Pwm_M
 
             for (ChannelIndex = 0; ChannelIndex < driver->base.channelCount; ChannelIndex++)
             {
-                IfxGtm_Atom_Ch Channel;
 
                 Channel = driver->ccx[ChannelIndex];
                 IfxGtm_Atom_Ch_setSignalLevel(driver->atom, Channel, Base->ccxActiveState); /*Every phase must have the same signal level, active state high*/
-
             }
         }
     }
@@ -257,7 +342,7 @@ boolean IfxGtm_AtomSerialChannelsInit(IfxGtm_Atom_PwmHl *driver, IfxGtm_Atom_Pwm
     driver->agc = (Ifx_GTM_ATOM_AGC *)&driver->atom->AGC.GLB_CTRL; /*In case we have channels from 0-6 we enable global control register 0*/
 
 
-    IFX_ASSERT(IFX_VERBOSE_LEVEL_ERROR, config->base.channelCount <= IfxGtm_Atom_PWMHL_MAX_NUM_CHANNELS); /*In case we have less than 2 controlled pwm signals return 0*/
+    IFX_ASSERT(IFX_VERBOSE_LEVEL_ERROR, config->base.channelCount <=MAX_ATOM_CHANNELS); /*In case we have less than 2 controlled pwm signals return 0*/
 
     IfxGtm_Cmu_Clk Clock = IfxGtm_Atom_Ch_getClockSource(Timer->atom, Timer->timerChannel); /*Set prescaler for every phase*/
 
@@ -280,7 +365,6 @@ boolean IfxGtm_AtomSerialChannelsInit(IfxGtm_Atom_PwmHl *driver, IfxGtm_Atom_Pwm
             IfxGtm_PinMap_setAtomTout(config->ccx[ChannelIndex],
                 config->base.outputMode, config->base.outputDriver);
         }
-
     }
     IfxGtm_Atom_Agc_enableChannelsOutput(driver->agc, ChannelsMask, 0, TRUE);
     IfxGtm_Atom_Agc_enableChannels(driver->agc, ChannelsMask, 0, TRUE);
@@ -288,8 +372,8 @@ boolean IfxGtm_AtomSerialChannelsInit(IfxGtm_Atom_PwmHl *driver, IfxGtm_Atom_Pwm
 
     IfxGtm_AtomSerialThreeTimersSetMode(driver, Ifx_Pwm_Mode_off); /*Enable the timers by having zero dutycycle*/
 
-    Ifx_TimerValue tOn[MAX_ATOM_CHANNELS] = {0};
-    IfxGtmTomSerialUpdateOff(driver, tOn);     /* tOn do not need defined values */
+    Ifx_TimerValue tOn[MAX_ATOM_CHANNELS] = {0xFFFF, 0x0, 0x0, 0x0};
+    IfxGtmAtomSerialUpdateOff(driver, tOn);     /* tOn do not need defined values */
     /* Transfer the shadow registers */
     IfxGtm_Atom_Agc_setChannelsForceUpdate(driver->agc, ChannelsMask, 0, 0, 0);
     IfxGtm_Atom_Agc_trigger(driver->agc);
@@ -301,11 +385,58 @@ boolean IfxGtm_AtomSerialChannelsInit(IfxGtm_Atom_PwmHl *driver, IfxGtm_Atom_Pwm
         IfxGtm_Atom_Timer_addToChannelMask(Timer, driver->ccx[ChannelIndex]);
     }
 
+    IfxGtmAtomStoreSrRegs(driver);
+
+    /* Here we set up the daisy chain dma channels */
+    AtomPhaseSerial_DataChannel[0].channelId = IfxDma_ChannelId_10;
+    Dma_InitDaisyChainMaster(&AtomPhaseSerial_DataChannel[0], 1, (uint32)(&AtomPhaseSerial_TxSpiBuffer_Ch1[0]),
+        (uint32)(&AtomPhaseSerial_MosiChannels[0]->SR1.U), 0,IfxDma_ChannelIncrementCircular_256,
+        IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelMoveSize_16bit);
+
+    AtomPhaseSerial_DataChannel[1].channelId = IfxDma_ChannelId_9;
+    Dma_InitDaisyChain(&AtomPhaseSerial_DataChannel[1], 1, (uint32)(&AtomPhaseSerial_TxSpiBuffer_Ch2[0]),
+        (uint32)(&AtomPhaseSerial_MosiChannels[1]->SR1.U), 0,IfxDma_ChannelIncrementCircular_256,
+        IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelMoveSize_16bit);
+
+    AtomPhaseSerial_DataChannel[2].channelId = IfxDma_ChannelId_8;
+    Dma_InitDaisyChain(&AtomPhaseSerial_DataChannel[2], 1, (uint32)(&AtomPhaseSerial_TxSpiBuffer_Ch3[0]),
+        (uint32)(&AtomPhaseSerial_MosiChannels[2]->SR1.U), 0,IfxDma_ChannelIncrementCircular_256,
+        IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelMoveSize_16bit);
+
     return Result;
 }
 
+
+/* Initialization of the dma channels for the fifo channels */
+static void AruPhaseSerial_DmaInit(ATOMPHASESERIAL_INPUTBUFFER* Message)
+{
+
+  /* Initialization of the Dma Fifo 2 channel */
+  AtomPhaseSerial_DmaChannel[0].channelId = (IfxDma_ChannelId)0;
+  AtomPhaseSerial_DmaChannel[1].channelId = (IfxDma_ChannelId)1;
+  AtomPhaseSerial_DmaChannel[2].channelId = (IfxDma_ChannelId)2;
+
+  Dma_Init(&AtomPhaseSerial_DmaChannel[0], QUAD_SPI_BUFFER_SIZE >> 2, (uint32)(&Message[0][0]),
+      (uint32)(&AtomPhaseSerial_TxBuffer[0][0]), 0,IfxDma_ChannelIncrementCircular_128,
+      IfxDma_ChannelIncrementCircular_128, IfxDma_ChannelMoveSize_32bit);
+
+  Dma_Init(&AtomPhaseSerial_DmaChannel[1], QUAD_SPI_BUFFER_SIZE >> 2, (uint32)(&Message[1][0]),
+      (uint32)(&AtomPhaseSerial_TxBuffer[1][0]), 0,IfxDma_ChannelIncrementCircular_128, IfxDma_ChannelIncrementCircular_128,
+      IfxDma_ChannelMoveSize_32bit);
+  Dma_Init(&AtomPhaseSerial_DmaChannel[2], QUAD_SPI_BUFFER_SIZE >> 2, (uint32)(&Message[2][0]),
+      (uint32)(&AtomPhaseSerial_TxBuffer[2][0]), QUAD_SPI_DMA_ISR,IfxDma_ChannelIncrementCircular_128,
+      IfxDma_ChannelIncrementCircular_128, IfxDma_ChannelMoveSize_32bit);
+
+}
+
+
+
+
+
+
 /*Main function of the Three timers Phase shift PWM*/
-void AtomPhaseSerial_Init(float32 baseFrequency,IfxGtm_Atom_ToutMap* masterPin, IfxGtm_Atom_ToutMapP* slavePins)
+void AtomPhaseSerial_Init(float32 baseFrequency,IfxGtm_Atom_ToutMap* masterPin, IfxGtm_Atom_ToutMapP* slavePins,
+                          ATOMPHASESERIAL_INPUTBUFFER* Message)
 {
   IfxGtm_Cmu_Clk ClckSrc= IfxGtm_Cmu_Clk_5;
   IfxGtm_Cmu_Clk SpiClk = IfxGtm_Cmu_Clk_4;
@@ -339,12 +470,9 @@ void AtomPhaseSerial_Init(float32 baseFrequency,IfxGtm_Atom_ToutMap* masterPin, 
   IfxGtm_Atom_Agc_enableChannelUpdate(AtomPhaseSerial_Output.timer.agc,AtomPhaseSerial_Output.timer.triggerChannel,TRUE);
 
   /* Initialize the SpiClk Pwm */
-  IfxGtmTomSerialSetSpiClk(slavePins[3], SpiClk, baseFrequency);
-  /* Get the Spi Period */
-  AtomPhaseSerial_Output.spiPeriod = IfxGtm_Atom_Ch_getCompareZero(AtomPhaseSerial_Output.SpiClk.atom, AtomPhaseSerial_Output.SpiClk.triggerChannel);
+  IfxGtmAtomSerialSetSpiClk(slavePins[MAX_ATOM_CHANNELS], SpiClk, baseFrequency);
   /* Here we stop the spi clock and we will update it inside the isr */
   IfxGtm_Atom_Timer_stop(&AtomPhaseSerial_Output.SpiClk);
-
   /* Initialize the slave mosi channels */
   IfxGtm_Atom_PwmHl_Config PwmHlConfig;
 
@@ -352,7 +480,8 @@ void AtomPhaseSerial_Init(float32 baseFrequency,IfxGtm_Atom_ToutMap* masterPin, 
           {
               slavePins[0], /* PWM High-side 1 */
               slavePins[1], /* PWM High-side 2 */
-              slavePins[2]  /* PWM High-side 3 is null since the third pwm phase is provide by the master timer*/
+              slavePins[2],  /* PWM High-side 3 is null since the third pwm phase is provide by the master timer*/
+              slavePins[3]
           };
   IfxGtm_Atom_PwmHl_initConfig(&PwmHlConfig);
   PwmHlConfig.base.channelCount = MAX_ATOM_CHANNELS; /* Controlled channels are three */
@@ -371,34 +500,45 @@ void AtomPhaseSerial_Init(float32 baseFrequency,IfxGtm_Atom_ToutMap* masterPin, 
   PwmHlConfig.timer = &AtomPhaseSerial_Output.timer;  /* Use as master timer the timer we initialized */
   PwmHlConfig.atom   = TimerConfig.atom;
 
+
   IfxGtm_AtomSerialChannelsInit(&AtomPhaseSerial_Output.pwm, &PwmHlConfig); /* Run the initialize of the three timers function */
 
-  IfxGtm_AtomSerialThreeTimersSetMode(&AtomPhaseSerial_Output.pwm, Ifx_Pwm_Mode_centerAligned); /* Start the actual PWM signals */
+  /* Initialize the Dma channels */
+  AruPhaseSerial_DmaInit(Message);
+
+
+  /* Set the shadow registers */
+  IfxGtm_AtomSerialThreeTimersSetMode(&AtomPhaseSerial_Output.pwm, Ifx_Pwm_Mode_centerAligned);
+
   /* Update the input frequency */
   IfxGtm_Atom_Timer_updateInputFrequency(&AtomPhaseSerial_Output.timer);
-  IfxGtm_Atom_Timer_run(&AtomPhaseSerial_Output.timer); /* Start the count of master timer */
-  /* Calculate initial values of PWM duty cycles */
-  AtomPhaseSerial_Output.pwmOnTimes[0] = 0; /* First controlled signal is shifted to a percentage of master timer's period */
-  AtomPhaseSerial_Output.pwmOnTimes[1] = 0; /* Second controlled signal is shifted to two times the percentage of master timer's period */
-  AtomPhaseSerial_Output.pwmOnTimes[2] = 0;
-  /* Update PWM duty cycles */
-  IfxGtm_Atom_Timer_disableUpdate(&AtomPhaseSerial_Output.timer); /* Disable the update of master timer */
-  IfxGtmTomSerialUpdatePeriod(&AtomPhaseSerial_Output.pwm);
-  IfxGtm_AtomSerialThreeTimersSetOnTime(&AtomPhaseSerial_Output.pwm, AtomPhaseSerial_Output.pwmOnTimes); /* Set the shadow registers of the controlled pwm signals */
+
+  /* Initialize the cm0 registers with the bitshift */
+  IfxGtm_Atom_Timer_disableUpdate(&AtomPhaseSerial_Output.timer);
+  IfxGtmAtomSerialUpdatePeriod(&AtomPhaseSerial_Output.pwm);
   IfxGtm_Atom_Timer_applyUpdate(&AtomPhaseSerial_Output.timer);  /* Start every PWM signal at the same time */
+  IfxGtm_Atom_Timer_stop(&AtomPhaseSerial_Output.timer);
+
 }
 
 
-void AtomPhaseSerial_SetDutyCycle(uint32* pwmOnTime)
+void AtomPhaseSerial_StartQuadSpiTranscaction(uint32 size)
 {
-  AtomPhaseSerial_Output.pwmOnTimes[0] = pwmOnTime[0]; /* First controlled signal is shifted to a percentage of master timer's period */
-  AtomPhaseSerial_Output.pwmOnTimes[1] = pwmOnTime[1]; /* Second controlled signal is shifted to two times the percentage of master timer's period */
-  AtomPhaseSerial_Output.pwmOnTimes[2] = pwmOnTime[2];
+  AtomPhaseSerial_DataRemain = size << 1;
 
-  IfxGtm_Atom_Timer_disableUpdate(&AtomPhaseSerial_Output.timer); /* Disable the update of master timer */
-  IfxGtm_AtomSerialThreeTimersSetOnTime(&AtomPhaseSerial_Output.pwm, AtomPhaseSerial_Output.pwmOnTimes); /* Set the shadow registers of the controlled pwm signals */
-  IfxGtm_Atom_Timer_applyUpdate(&AtomPhaseSerial_Output.timer);  /* Start every PWM signal at the same time */
-
-  AtomPhaseSerial_State = ATOM_SPI_START;
+  if (AtomPhaseSerial_DataRemain > QUAD_SPI_BUFFER_SIZE)
+  {
+    AtomPhaseSerial_RingBufferSize += QUAD_SPI_BUFFER_SIZE;
+  }
+  else
+  {
+    AtomPhaseSerial_RingBufferSize += (uint8)AtomPhaseSerial_DataRemain;
+    /* Transfer with Dma to all the fifos */
+    for (uint8 i = 0; i < MOSI_CHANNELS; i++)
+    {
+      IfxDma_Dma_setChannelTransferCount(&AtomPhaseSerial_DmaChannel[i], size);
+      IfxDma_startChannelTransaction(AtomPhaseSerial_DmaChannel[i].dma, AtomPhaseSerial_DmaChannel[i].channelId);
+    }
+  }
 }
 

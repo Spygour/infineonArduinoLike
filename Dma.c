@@ -51,7 +51,7 @@
 /*********************************************************************************************************************/
 
 
-void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc, IfxDma_ChannelIncrementCircular DstCirc)
+void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint16 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress, uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc, IfxDma_ChannelIncrementCircular DstCirc,IfxDma_ChannelMoveSize moveSize )
 {
   IfxDma_Dma Dma_Inst;
   /* Create module configuration */
@@ -69,7 +69,7 @@ void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 So
   DmaChCfg.channelId = DmaChannel->channelId;
   DmaChCfg.transferCount = BytesPerTransfer;
   DmaChCfg.requestMode = IfxDma_ChannelRequestMode_completeTransactionPerRequest;
-  DmaChCfg.moveSize = IfxDma_ChannelMoveSize_8bit;
+  DmaChCfg.moveSize = moveSize;
   DmaChCfg.operationMode = IfxDma_ChannelOperationMode_single;
 
   /* Source Address configuration */
@@ -91,6 +91,108 @@ void Dma_Init(IfxDma_Dma_Channel* DmaChannel,  uint8 BytesPerTransfer, uint32 So
   DmaChCfg.channelInterruptControl = IfxDma_ChannelInterruptControl_thresholdLimitMatch;
   DmaChCfg.channelInterruptPriority = Priority;
   DmaChCfg.channelInterruptTypeOfService = IfxSrc_Tos_cpu0;
+
+  IfxDma_Dma_initChannel(DmaChannel, &DmaChCfg);
+}
+
+void Dma_InitDaisyChainMaster(IfxDma_Dma_Channel* DmaChannel,  uint16 BytesPerTransfer, uint32 SourceAddress,
+    uint32 DestinationAddress, uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc,
+    IfxDma_ChannelIncrementCircular DstCirc, IfxDma_ChannelMoveSize moveSize )
+{
+  IfxDma_Dma Dma_Inst;
+  /* Create module configuration */
+  IfxDma_Dma_Config dmaConfig;
+  IfxDma_Dma_initModuleConfig(&dmaConfig, &MODULE_DMA);
+
+  /* Initialize module */
+  IfxDma_Dma_initModule(&Dma_Inst, &dmaConfig);
+
+  /* Initial channel configuration */
+  IfxDma_Dma_ChannelConfig DmaChCfg;
+  IfxDma_Dma_initChannelConfig(&DmaChCfg, &Dma_Inst);
+
+  /* Following settings are used by all transactions of the linked list */
+  DmaChCfg.channelId = DmaChannel->channelId;
+  DmaChCfg.transferCount = BytesPerTransfer;
+  DmaChCfg.requestMode = IfxDma_ChannelRequestMode_completeTransactionPerRequest;
+  DmaChCfg.moveSize = moveSize;
+  DmaChCfg.operationMode = IfxDma_ChannelOperationMode_single;
+  DmaChCfg.requestSource = IfxDma_ChannelRequestSource_daisyChain;
+
+
+  /* Source Address configuration */
+  DmaChCfg.sourceAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
+  DmaChCfg.sourceAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
+  DmaChCfg.sourceAddressCircularRange = SourceCirc;
+  DmaChCfg.sourceCircularBufferEnabled = TRUE;
+
+  /* Destination Address configuration */
+  DmaChCfg.destinationAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
+  DmaChCfg.destinationAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
+  DmaChCfg.destinationAddressCircularRange = DstCirc;
+  DmaChCfg.destinationCircularBufferEnabled = TRUE;
+
+  /* Handle the source and destination Address */
+  DmaChCfg.sourceAddress = (uint32)SourceAddress;
+  DmaChCfg.destinationAddress = (uint32)DestinationAddress;
+
+  /* ISR control */
+  DmaChCfg.channelInterruptEnabled = TRUE;
+  DmaChCfg.channelInterruptControl = IfxDma_ChannelInterruptControl_thresholdLimitMatch;
+  DmaChCfg.channelInterruptPriority = Priority;
+  DmaChCfg.channelInterruptTypeOfService = IfxSrc_Tos_cpu0;
+
+  IfxDma_Dma_initChannel(DmaChannel, &DmaChCfg);
+}
+
+
+void Dma_InitDaisyChain(IfxDma_Dma_Channel* DmaChannel,  uint16 BytesPerTransfer, uint32 SourceAddress, uint32 DestinationAddress,
+    uint8 Priority, IfxDma_ChannelIncrementCircular SourceCirc, IfxDma_ChannelIncrementCircular DstCirc,
+    IfxDma_ChannelMoveSize moveSize )
+{
+  IfxDma_Dma Dma_Inst;
+  /* Create module configuration */
+  IfxDma_Dma_Config dmaConfig;
+  IfxDma_Dma_initModuleConfig(&dmaConfig, &MODULE_DMA);
+
+  /* Initialize module */
+  IfxDma_Dma_initModule(&Dma_Inst, &dmaConfig);
+
+  /* Initial channel configuration */
+  IfxDma_Dma_ChannelConfig DmaChCfg;
+  IfxDma_Dma_initChannelConfig(&DmaChCfg, &Dma_Inst);
+
+  /* Following settings are used by all transactions of the linked list */
+  DmaChCfg.channelId = DmaChannel->channelId;
+  DmaChCfg.transferCount = BytesPerTransfer;
+  DmaChCfg.requestMode = IfxDma_ChannelRequestMode_completeTransactionPerRequest;
+  DmaChCfg.moveSize = moveSize;
+  DmaChCfg.operationMode = IfxDma_ChannelOperationMode_single;
+  DmaChCfg.requestSource = IfxDma_ChannelRequestSource_daisyChain;
+
+
+  /* Source Address configuration */
+  DmaChCfg.sourceAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
+  DmaChCfg.sourceAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
+  DmaChCfg.sourceAddressCircularRange = SourceCirc;
+  DmaChCfg.sourceCircularBufferEnabled = TRUE;
+
+  /* Destination Address configuration */
+  DmaChCfg.destinationAddressIncrementDirection = IfxDma_ChannelIncrementDirection_positive;
+  DmaChCfg.destinationAddressIncrementStep = IfxDma_ChannelIncrementStep_1;
+  DmaChCfg.destinationAddressCircularRange = DstCirc;
+  DmaChCfg.destinationCircularBufferEnabled = TRUE;
+
+  /* Handle the source and destination Address */
+  DmaChCfg.sourceAddress = (uint32)SourceAddress;
+  DmaChCfg.destinationAddress = (uint32)DestinationAddress;
+
+  /* ISR control */
+  DmaChCfg.channelInterruptEnabled = TRUE;
+  DmaChCfg.channelInterruptControl = IfxDma_ChannelInterruptControl_thresholdLimitMatch;
+  DmaChCfg.channelInterruptPriority = Priority;
+  DmaChCfg.channelInterruptTypeOfService = IfxSrc_Tos_cpu0;
+  DmaChCfg.hardwareRequestEnabled = TRUE;
 
   IfxDma_Dma_initChannel(DmaChannel, &DmaChCfg);
 }

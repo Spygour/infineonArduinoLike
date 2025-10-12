@@ -27,10 +27,9 @@
 
 #ifndef INFINEONARDUINOLIKE_INTERRUPTS_H_
 #define INFINEONARDUINOLIKE_INTERRUPTS_H_
-#include "IfxGpt12.h"
 #include "Ifx_Types.h"
-#include "IfxGpt12.h"
 #include "IfxGtm_Atom_Timer.h"
+#include "IfxGpt12.h"
 #include "IfxGtm_Tom_Timer.h"
 
 

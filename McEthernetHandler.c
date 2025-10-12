@@ -74,7 +74,7 @@ void McEthHandler_DmaStoreIsr(void)
 void McEthHandler_Init(uint8* SrcMacAddress)
 {
   /* Initialize the Source and Destination to be the same  then it will change in the next transaction */
-  Dma_Init(&McEthHandler_DmaStorePayload, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Payload.Buffer[0]), (uint32)(&McEth_Payload.Buffer[0]), DMA_ETH_HANDLER_STORE_PRIORITY,IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelIncrementCircular_2048);
+  Dma_Init(&McEthHandler_DmaStorePayload, MC_ETHERNET_DATASIZE, (uint32)(&McEth_Payload.Buffer[0]), (uint32)(&McEth_Payload.Buffer[0]), DMA_ETH_HANDLER_STORE_PRIORITY,IfxDma_ChannelIncrementCircular_none, IfxDma_ChannelIncrementCircular_2048, IfxDma_ChannelMoveSize_8bit);
   /* Init the Ethernet Module */
   McEth_Init(SrcMacAddress);
 }

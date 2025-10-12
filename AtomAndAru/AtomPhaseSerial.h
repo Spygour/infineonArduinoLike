@@ -47,13 +47,16 @@ typedef struct
 } IfxGtm_Atom_Serial;
 
 
-typedef enum
+typedef uint16* ATOMPHASESERIAL_SPIBUFFER;
+typedef uint32* ATOMPHASESERIAL_INPUTBUFFER;
+
+typedef Ifx_GTM_ATOM_CH* ATOMPHASESERIAL_MOSIREGS;
+
+typedef struct
 {
-  ATOM_SPI_WAIT,
-  ATOM_SPI_START,
-  ATOM_SPI_RUN,
-  ATOM_SPI_END
-}ATOMPHASESERIAL_STATE;
+    ATOMPHASESERIAL_SPIBUFFER* SpiBuffer;
+    uint8* ringBufferSize;
+}ATOMPHASESERIAL_RINGBUFFER;
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
 /*********************************************************************************************************************/
@@ -69,6 +72,6 @@ typedef enum
 /*********************************************************************************************************************/
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
-void AtomPhaseSerial_Init(float32 baseFrequency,IfxGtm_Atom_ToutMap* masterPin, IfxGtm_Atom_ToutMapP* slavePins);
-void AtomPhaseSerial_SetDutyCycle(uint32* pwmOnTime);
+void AtomPhaseSerial_Init(float32 baseFrequency,IfxGtm_Atom_ToutMap* masterPin, IfxGtm_Atom_ToutMapP* slavePins, ATOMPHASESERIAL_INPUTBUFFER* Message);
+void AtomPhaseSerial_StartQuadSpiTranscaction(uint32 size);
 #endif /* INFINEONARDUINOLIKE_ATOMANDARU_ATOMPHASESERIAL_H_ */
