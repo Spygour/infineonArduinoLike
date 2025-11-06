@@ -47,6 +47,8 @@ IfxQspi_SpiSlave  *SpiSlave1Ptr = NULL_PTR;
 
 static uint8 SpiTxBuffer[256];
 static uint8 SpiRxBuffer[256];
+
+
 /*********************************************************************************************************************/
 /*--------------------------------------------Private Variables/Constants--------------------------------------------*/
 /*********************************************************************************************************************/
@@ -119,7 +121,7 @@ static uint8 SpiRxBuffer[256];
    spiMasterChannelConfig.sls.output = SpiSlaveSelect;
 
    spiMasterChannelConfig.ch.baudrate = ChannelConfig->Baudrate;    /* Set SCLK frequency to 10 MHz              */
-   spiMasterChannelConfig.ch.mode.dataWidth = 8;        /* Set the transfer data width to 8 bits    */
+   spiMasterChannelConfig.ch.mode.dataWidth = ChannelConfig->DataWidth;        /* Set the transfer data width to 8 bits    */
    spiMasterChannelConfig.ch.mode.clockPolarity = ChannelConfig->ClockPolarity;
    spiMasterChannelConfig.ch.mode.shiftClock = ChannelConfig->ShiftClock;
    spiMasterChannelConfig.ch.mode.dataHeading = ChannelConfig->DataHeading;
@@ -305,6 +307,153 @@ void Spi_SetTxBufferIndex(uint8 val, uint8 index)
 {
   SpiTxBuffer[index] = val;
 }
+
+/**************************************************************************/
+/****************************SPI DMA PART *********************************/
+/**************************************************************************/
+/** \brief Initializes the Spi Module
+ * \param Spi_ChannelInit
+ * \return void
+ */
+void Spi_DmaInit(SpiMasterPins_t* SpiMasterPins, SpiMasterDmaCfg_t* MasterCfg)
+{
+  IfxQspi_SpiMaster_Config spiMasterConfig;                           /* Define a Master configuration            */
+
+  IfxQspi_SpiMaster_initModuleConfig(&spiMasterConfig, SpiMasterPins->SpiMosi->module); /* Initialize it with default values        */
+
+  spiMasterConfig.mode = IfxQspi_Mode_master;                      /* Configure the mode                       */
+
+  /* Select the port pins for communication */
+  const IfxQspi_SpiMaster_Pins SpiMasterPinsCfg = {
+      SpiMasterPins->SpiClk, IfxPort_OutputMode_pushPull,          /* SCLK Pin                       (CLK)     */
+      SpiMasterPins->SpiMosi, IfxPort_OutputMode_pushPull,          /* MasterTransmitSlaveReceive pin (MOSI)    */
+      SpiMasterPins->SpiMiso, IfxPort_InputMode_pullDown,           /* MasterReceiveSlaveTransmit pin (MISO)    */
+      IfxPort_PadDriver_cmosAutomotiveSpeed2                          /* Pad driver mode                          */
+  };
+  /* Select the port pins for communication */
+  spiMasterConfig.pins = &SpiMasterPinsCfg;                            /* Assign the Master's port pins            */
+
+  /* Set the ISR priorities and the service provider */
+  spiMasterConfig.txPriority = 0u;
+  spiMasterConfig.rxPriority = MasterCfg->RxIsr;
+  spiMasterConfig.erPriority = MasterCfg->ErIsr;
+  spiMasterConfig.dma.rxDmaChannelId = MasterCfg->DmaCfgPtr->rxDmaChannelId;
+  spiMasterConfig.dma.txDmaChannelId = MasterCfg->DmaCfgPtr->txDmaChannelId;
+  spiMasterConfig.dma.useDma = TRUE;
+  spiMasterConfig.isrProvider = IfxSrc_Tos_cpu0;
+  /* Initialize the QSPI Master module */
+  IfxQspi_SpiMaster_initModuleAsync(MasterCfg->SpiMasterPtr, &spiMasterConfig);
+
+  MasterCfg->IsActive = TRUE;
+}
+
+
+/** \brief Initialize an Spi Channel
+ * \param Spi_ChannelInit
+ * \return void
+ */
+void Spi_DmaChannelInit(SpiMasterDmaCfg_t* SpiMasterCfg, SpiChannel_t* SpiChannel, SpiChannelConfig* ChannelConfig)
+{
+  IfxQspi_SpiMaster_ChannelConfig spiMasterChannelConfig;             /* Define a Master Channel configuration    */
+
+  /* Initialize the configuration with default values */
+  IfxQspi_SpiMaster_initChannelConfig(&spiMasterChannelConfig, SpiMasterCfg->SpiMasterPtr);
+
+  const IfxQspi_SpiMaster_Output SpiSlaveSelect = {                 /* QSPI1 Master selects the QSPI3 Slave     */
+      ChannelConfig->ChannelOutput, IfxPort_OutputMode_pushPull,         /* Slave Select port pin (CS)               */
+      IfxPort_PadDriver_cmosAutomotiveSpeed1                          /* Pad driver mode                          */
+  };
+  spiMasterChannelConfig.sls.output = SpiSlaveSelect;
+
+  spiMasterChannelConfig.ch.baudrate = ChannelConfig->Baudrate;    /* Set SCLK frequency to 10 MHz              */
+  spiMasterChannelConfig.ch.mode.dataWidth = ChannelConfig->DataWidth;        /* Set the transfer data width to 8 bits    */
+  spiMasterChannelConfig.ch.mode.clockPolarity = ChannelConfig->ClockPolarity;
+  spiMasterChannelConfig.ch.mode.shiftClock = ChannelConfig->ShiftClock;
+  spiMasterChannelConfig.ch.mode.dataHeading = ChannelConfig->DataHeading;
+  spiMasterChannelConfig.ch.mode.parityCheck = 0;
+  spiMasterChannelConfig.ch.mode.autoCS = 1;
+  spiMasterChannelConfig.dma->useDma = TRUE;
+  spiMasterChannelConfig.dma->txDmaChannelId = SpiMasterCfg->DmaCfgPtr->txDmaChannelId;
+  spiMasterChannelConfig.dma->rxDmaChannelId = SpiMasterCfg->DmaCfgPtr->rxDmaChannelId;
+  spiMasterChannelConfig.channelBasedCs = IfxQspi_SpiMaster_ChannelBasedCs_enabled;
+  spiMasterChannelConfig.mode = IfxQspi_SpiMaster_Mode_short;
+  spiMasterChannelConfig.ch.mode.csInactiveDelay = 10;
+  spiMasterChannelConfig.ch.mode.csLeadDelay = 4;
+  spiMasterChannelConfig.ch.mode.csTrailDelay = 5;
+
+  spiMasterChannelConfig.dma->txDmaChannel.channel = &MODULE_DMA.CH[SpiMasterCfg->DmaCfgPtr->txDmaChannelId];
+  spiMasterChannelConfig.dma->txDmaChannel.dma = &MODULE_DMA;
+  spiMasterChannelConfig.dma->txDmaChannel.channelId = SpiMasterCfg->DmaCfgPtr->txDmaChannelId;
+
+  spiMasterChannelConfig.dma->rxDmaChannel.channel = &MODULE_DMA.CH[SpiMasterCfg->DmaCfgPtr->rxDmaChannelId];
+  spiMasterChannelConfig.dma->rxDmaChannel.dma = &MODULE_DMA;
+  spiMasterChannelConfig.dma->rxDmaChannel.channelId = SpiMasterCfg->DmaCfgPtr->rxDmaChannelId;
+
+  /* Select the port pin for the Chip Select signal */
+
+
+  /* Initialize the QSPI Master channel */
+  IfxQspi_SpiMaster_initChannel(SpiChannel, &spiMasterChannelConfig);
+
+}
+
+void SpiAsync(IfxQspi_SpiMaster_Channel *chHandle, const void *src, void *dest, Ifx_SizeT count)
+{
+    IfxQspi_SpiMaster_DmaExchange(chHandle, src,
+                               dest, count, IfxDma_ChannelIncrementCircular_128);
+}
+
+/* Example of usage the Spi async  Note this needs extra update on the IfxQspi_SpiMaster file */
+
+//static IfxQspi_SpiMaster Master;
+//static DmaConfig_t SpiDmaCfg = {
+//        IfxDma_ChannelId_3,
+//        IfxDma_ChannelId_4,
+//        TRUE
+//};
+//static SpiMasterDmaCfg_t SpiMaster =  {
+//        &Master,
+//        &SpiDmaCfg,
+//        DMA_ISR_TX,
+//        DMA_ISR_RX,
+//        DMA_ISR_ERR
+//};
+//
+//static SpiMasterPins_t SpiPins = {
+//    &IfxQspi1_SCLK_P10_2_OUT,
+//    &IfxQspi1_MTSR_P10_3_OUT,
+//    &IfxQspi1_MRSTA_P10_1_IN
+//};
+//
+//static SpiChannelConfig SpiChannelCfg = {
+//        &IfxQspi1_SLSO3_P11_10_OUT,
+//        5000000 ,
+//        0,
+//        TRUE,
+//        32,
+//        TRUE
+//    };
+//
+//static SpiChannel_t SpiChannel;
+//
+//
+//uint32 BytesRemain;
+//volatile uint32 BytesSent = 0;
+//volatile boolean SpiEnd = FALSE;
+//
+//IFX_INTERRUPT(Dma_IsrRx, 0 , DMA_ISR_RX);
+//void Dma_IsrRx(void)
+//{
+//    IfxCpu_enableInterrupts();
+//    IfxQspi_SpiMaster_isrDmaReceiveAsync(SpiMaster.SpiMasterPtr);
+//}
+//
+//IFX_INTERRUPT(Dma_IsrErr, 0 , DMA_ISR_ERR);
+//void Dma_IsrErr(void)
+//{
+//    IfxCpu_enableInterrupts();
+//    IfxQspi_SpiMaster_isrError(SpiMaster.SpiMasterPtr);
+//}
  /*************************************************************************/
  /************************** SPI Slave Part *******************************/
  /*************************************************************************/

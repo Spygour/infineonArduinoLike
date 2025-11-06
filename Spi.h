@@ -43,11 +43,13 @@ typedef struct
     float32                Baudrate;
     boolean       ClockPolarity;
     boolean       ShiftClock;
+    uint8        DataWidth;
     boolean      DataHeading;
 }SpiChannelConfig;
 
 typedef IfxQspi_SpiMaster SpiMaster_t;
 typedef IfxQspi_SpiMaster_Channel SpiChannel_t;
+typedef IfxQspi_SpiMaster_DmaConfig DmaConfig_t;
 typedef struct
 {
     IfxQspi_Sclk_Out* SpiClk;
@@ -58,11 +60,23 @@ typedef struct
 typedef struct
 {
     SpiMaster_t*          SpiMasterPtr;
+    DmaConfig_t*          DmaCfgPtr;
+    uint8                 TxIsr;
+    uint8                 RxIsr;
+    uint8                 ErIsr;
+    boolean               IsActive;
+}SpiMasterDmaCfg_t;
+
+
+typedef struct
+{
+    SpiMaster_t*          SpiMasterPtr;
     uint8                 TxIsr;
     uint8                 RxIsr;
     uint8                 ErIsr;
     boolean               IsActive;
 }SpiMasterCfg_t;
+
 
 typedef struct
 {
@@ -95,6 +109,11 @@ void Spi_WriteBytes(SpiChannel_t* SpiChannel, uint8* Src, uint16 size);
 void Spi_ReadBytes(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint8* Dest, uint16 DestSize);
 void Spi_WriteBuffer(SpiChannel_t* SpiChannel, uint16 size);
 void Spi_ReadBuffer(SpiChannel_t* SpiChannel,uint8* Src, uint16 SrcSize, uint16 size);
+
+void Spi_DmaInit(SpiMasterPins_t* SpiMasterPins, SpiMasterDmaCfg_t* MasterCfg);
+void Spi_DmaChannelInit(SpiMasterDmaCfg_t* SpiMasterCfg, SpiChannel_t* SpiChannel, SpiChannelConfig* ChannelConfig);
+void SpiAsync(IfxQspi_SpiMaster_Channel *chHandle, const void *src, void *dest, Ifx_SizeT count);
+
 uint32 Spi_ReturnSpiTxBufferAddr(uint16 index);
 uint32 Spi_ReturnSpiRxBufferAddr(uint16 index);
 void Spi_SetTxBufferIndex(uint8 val, uint8 index);
