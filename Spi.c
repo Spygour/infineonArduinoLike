@@ -403,7 +403,8 @@ void SpiAsync(IfxQspi_SpiMaster_Channel *chHandle, const void *src, void *dest, 
                                dest, count, IfxDma_ChannelIncrementCircular_128);
 }
 
-/* Example of usage the Spi async  Note this needs extra update on the IfxQspi_SpiMaster file */
+/* Example of usage the Spi async
+ * ***Note this needs extra update on the IfxQspi_SpiMaster file, Please contact me for the extra functions */
 
 //static IfxQspi_SpiMaster Master;
 //static DmaConfig_t SpiDmaCfg = {
