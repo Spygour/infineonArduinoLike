@@ -334,7 +334,7 @@ void Spi_DmaInit(SpiMasterPins_t* SpiMasterPins, SpiMasterDmaCfg_t* MasterCfg)
   spiMasterConfig.pins = &SpiMasterPinsCfg;                            /* Assign the Master's port pins            */
 
   /* Set the ISR priorities and the service provider */
-  spiMasterConfig.txPriority = 0u;
+  spiMasterConfig.txPriority = MasterCfg->TxIsr;
   spiMasterConfig.rxPriority = MasterCfg->RxIsr;
   spiMasterConfig.erPriority = MasterCfg->ErIsr;
   spiMasterConfig.dma.rxDmaChannelId = MasterCfg->DmaCfgPtr->rxDmaChannelId;
@@ -342,7 +342,7 @@ void Spi_DmaInit(SpiMasterPins_t* SpiMasterPins, SpiMasterDmaCfg_t* MasterCfg)
   spiMasterConfig.dma.useDma = TRUE;
   spiMasterConfig.isrProvider = IfxSrc_Tos_cpu0;
   /* Initialize the QSPI Master module */
-  IfxQspi_SpiMaster_initModuleAsync(MasterCfg->SpiMasterPtr, &spiMasterConfig);
+  IfxQspi_SpiMaster_initModule(MasterCfg->SpiMasterPtr, &spiMasterConfig);
 
   MasterCfg->IsActive = TRUE;
 }
@@ -377,9 +377,9 @@ void Spi_DmaChannelInit(SpiMasterDmaCfg_t* SpiMasterCfg, SpiChannel_t* SpiChanne
   spiMasterChannelConfig.dma->rxDmaChannelId = SpiMasterCfg->DmaCfgPtr->rxDmaChannelId;
   spiMasterChannelConfig.channelBasedCs = IfxQspi_SpiMaster_ChannelBasedCs_enabled;
   spiMasterChannelConfig.mode = IfxQspi_SpiMaster_Mode_short;
-  spiMasterChannelConfig.ch.mode.csInactiveDelay = 10;
+  spiMasterChannelConfig.ch.mode.csInactiveDelay = 2;
   spiMasterChannelConfig.ch.mode.csLeadDelay = 4;
-  spiMasterChannelConfig.ch.mode.csTrailDelay = 5;
+  spiMasterChannelConfig.ch.mode.csTrailDelay = 3;
 
   spiMasterChannelConfig.dma->txDmaChannel.channel = &MODULE_DMA.CH[SpiMasterCfg->DmaCfgPtr->txDmaChannelId];
   spiMasterChannelConfig.dma->txDmaChannel.dma = &MODULE_DMA;
@@ -399,17 +399,16 @@ void Spi_DmaChannelInit(SpiMasterDmaCfg_t* SpiMasterCfg, SpiChannel_t* SpiChanne
 
 void SpiAsync(IfxQspi_SpiMaster_Channel *chHandle, const void *src, void *dest, Ifx_SizeT count)
 {
-    IfxQspi_SpiMaster_DmaExchange(chHandle, src,
-                               dest, count, IfxDma_ChannelIncrementCircular_128);
+        IfxQspi_SpiMaster_exchange(chHandle, src,
+                                   dest, count);
 }
 
-/* Example of usage the Spi async
- * ***Note this needs extra update on the IfxQspi_SpiMaster file, Please contact me for the extra functions */
+/* Example of usage the Spi async */
 
 //static IfxQspi_SpiMaster Master;
 //static DmaConfig_t SpiDmaCfg = {
-//        IfxDma_ChannelId_3,
-//        IfxDma_ChannelId_4,
+//        IfxDma_ChannelId_2,
+//        IfxDma_ChannelId_5,
 //        TRUE
 //};
 //static SpiMasterDmaCfg_t SpiMaster =  {
@@ -428,7 +427,7 @@ void SpiAsync(IfxQspi_SpiMaster_Channel *chHandle, const void *src, void *dest, 
 //
 //static SpiChannelConfig SpiChannelCfg = {
 //        &IfxQspi1_SLSO3_P11_10_OUT,
-//        5000000 ,
+//        1000000 ,
 //        0,
 //        TRUE,
 //        32,
@@ -442,11 +441,18 @@ void SpiAsync(IfxQspi_SpiMaster_Channel *chHandle, const void *src, void *dest, 
 //volatile uint32 BytesSent = 0;
 //volatile boolean SpiEnd = FALSE;
 //
+//IFX_INTERRUPT(Dma_IsrTx, 0 , DMA_ISR_TX);
+//void Dma_IsrTx(void)
+//{
+//    IfxCpu_enableInterrupts();
+//    IfxQspi_SpiMaster_isrDmaTransmit(SpiMaster.SpiMasterPtr);
+//}
+//
 //IFX_INTERRUPT(Dma_IsrRx, 0 , DMA_ISR_RX);
 //void Dma_IsrRx(void)
 //{
 //    IfxCpu_enableInterrupts();
-//    IfxQspi_SpiMaster_isrDmaReceiveAsync(SpiMaster.SpiMasterPtr);
+//    IfxQspi_SpiMaster_isrDmaReceive(SpiMaster.SpiMasterPtr);
 //}
 //
 //IFX_INTERRUPT(Dma_IsrErr, 0 , DMA_ISR_ERR);
@@ -455,6 +461,9 @@ void SpiAsync(IfxQspi_SpiMaster_Channel *chHandle, const void *src, void *dest, 
 //    IfxCpu_enableInterrupts();
 //    IfxQspi_SpiMaster_isrError(SpiMaster.SpiMasterPtr);
 //}
+//
+//uint32 Ena[128];
+//uint32 Duo[128];
  /*************************************************************************/
  /************************** SPI Slave Part *******************************/
  /*************************************************************************/
